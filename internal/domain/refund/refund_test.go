@@ -18,7 +18,9 @@ func req() refund.Request {
 	}
 }
 
-func lim() refund.Limits { return refund.Limits{CapturedMinor: 7000} }
+func lim() refund.Limits {
+	return refund.Limits{CapturedMinor: 7000, OrderCapturedMinor: 10000}
+}
 
 func newRefund(t *testing.T) *refund.Refund {
 	t.Helper()
@@ -59,15 +61,19 @@ func TestNewIsRequested(t *testing.T) {
 }
 
 func TestNewOverRefundCountsRequestedAndIssuedNotFailed(t *testing.T) {
-	_, err := refund.New(req(), refund.Limits{CapturedMinor: 7000, RefundedMinor: 1}, t0)
+	_, err := refund.New(req(), refund.Limits{CapturedMinor: 7000, RefundedMinor: 1, OrderCapturedMinor: 10000}, t0)
 	if !errors.Is(err, refund.ErrOverRefund) {
 		t.Fatalf("err = %v, want ErrOverRefund", err)
 	}
-	if _, err = refund.New(req(), refund.Limits{CapturedMinor: 6999}, t0); !errors.Is(err, refund.ErrOverRefund) {
+	if _, err = refund.New(req(), refund.Limits{CapturedMinor: 6999, OrderCapturedMinor: 10000}, t0); !errors.Is(err, refund.ErrOverRefund) {
 		t.Fatalf("err = %v, want ErrOverRefund", err)
 	}
-	if _, err = refund.New(req(), refund.Limits{CapturedMinor: 7000}, t0); err != nil {
+	if _, err = refund.New(req(), lim(), t0); err != nil {
 		t.Errorf("exact captured total: %v", err)
+	}
+	over := refund.Limits{CapturedMinor: 7000, OrderCapturedMinor: 10000, OrderRefundedMinor: 3001}
+	if _, err = refund.New(req(), over, t0); !errors.Is(err, refund.ErrOverRefund) {
+		t.Errorf("order-level over refund err = %v", err)
 	}
 }
 
@@ -85,7 +91,7 @@ func TestNewValidation(t *testing.T) {
 	for name, mut := range cases {
 		r := req()
 		mut(&r)
-		if _, err := refund.New(r, refund.Limits{CapturedMinor: shared.MaxMinor * 2}, t0); !errors.Is(err, shared.ErrValidation) {
+		if _, err := refund.New(r, refund.Limits{CapturedMinor: shared.MaxMinor * 2, OrderCapturedMinor: shared.MaxMinor * 2}, t0); !errors.Is(err, shared.ErrValidation) {
 			t.Errorf("%s: err = %v", name, err)
 		}
 	}

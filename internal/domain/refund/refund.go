@@ -68,12 +68,16 @@ type Request struct {
 	Reason      Reason
 }
 
-// Limits are the figures ErrOverRefund is judged against, for the scope of the
-// request (the group when GroupNo > 0, else the order).
+// Limits are the figures ErrOverRefund is judged against. The scope is the
+// group when GroupNo > 0, else the order; the order figures always apply.
 type Limits struct {
+	// CapturedMinor is the captured total of the scope.
 	CapturedMinor int64
 	// RefundedMinor sums the REQUESTED and SUCCEEDED refunds of the scope.
 	RefundedMinor int64
+	// OrderCapturedMinor and OrderRefundedMinor are the same for the order.
+	OrderCapturedMinor int64
+	OrderRefundedMinor int64
 }
 
 // Refund is the aggregate root.
@@ -93,7 +97,7 @@ func New(r Request, l Limits, now time.Time) (*Refund, error) {
 	if err := checkRequest(r); err != nil {
 		return nil, err
 	}
-	if l.RefundedMinor+r.AmountMinor > l.CapturedMinor {
+	if l.RefundedMinor+r.AmountMinor > l.CapturedMinor || l.OrderRefundedMinor+r.AmountMinor > l.OrderCapturedMinor {
 		return nil, fmt.Errorf("%w: %d already refunded or requested plus %d exceeds the %d captured",
 			ErrOverRefund, l.RefundedMinor, r.AmountMinor, l.CapturedMinor)
 	}
