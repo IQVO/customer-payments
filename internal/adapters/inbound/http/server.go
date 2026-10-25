@@ -5,6 +5,7 @@
 package http
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -36,6 +37,9 @@ type Server struct {
 	// POST routes.
 	IdempotencyStore ports.IdempotencyStore
 	Clock            ports.Clock
+	// ParkedFacts backs the gauge of GET /metrics (H10): how many fulfilment
+	// facts wait for their order to be bound; nil omits the gauge.
+	ParkedFacts func(ctx context.Context) (int, error)
 	// Readiness backs GET /readyz; nil means always ready (unit tests).
 	Readiness *Readiness
 }
@@ -50,6 +54,7 @@ func NewRouter(s *Server) http.Handler {
 
 	r.Get("/healthz", handleHealthz)
 	r.Get("/readyz", s.handleReadyz)
+	r.Get("/metrics", s.handleMetrics)
 
 	r.With(s.idempotent(routeAuthorize)).Post("/payment-authorizations", s.handleAuthorize)
 	r.Get("/payment-authorizations", s.handleListAuthorizations)

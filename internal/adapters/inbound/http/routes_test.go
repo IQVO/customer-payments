@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -143,4 +144,21 @@ func TestRefundRetryRoute(t *testing.T) {
 	}
 	e.wantProblem(e.post("/refunds/"+id+":retry", ""), http.StatusConflict, "illegal-transition")
 	e.wantProblem(e.post("/refunds/nope:retry", ""), http.StatusNotFound, "not-found")
+}
+
+func TestMetricsExposeTheParkedFactsGauge(t *testing.T) {
+	e := newEnv(t)
+	r := e.get("/metrics")
+	e.wantStatus(r, http.StatusOK)
+	if r.Body != "" {
+		t.Fatalf("no gauge configured, body = %q", r.Body)
+	}
+	e.gauge = func(context.Context) (int, error) { return 3, nil }
+	e.reroute()
+	if r = e.get("/metrics"); !strings.Contains(r.Body, "customer_payments_parked_facts 3\n") {
+		t.Fatalf("body = %q", r.Body)
+	}
+	e.gauge = func(context.Context) (int, error) { return 0, errors.New("db down") }
+	e.reroute()
+	e.wantStatus(e.get("/metrics"), http.StatusInternalServerError)
 }

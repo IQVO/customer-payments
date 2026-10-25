@@ -23,10 +23,10 @@ import (
 )
 
 const (
-	user         = "pricing_test"
-	password     = "pricing_test"
+	user         = "cp_test"
+	password     = "cp_test"
 	adminDB      = "postgres"
-	templateName = "pricing_template"
+	templateName = "cp_template"
 )
 
 var (

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -134,4 +135,20 @@ func (s *Server) handleRetryRefund(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, refundFrom(v))
+}
+
+// handleMetrics writes the Prometheus text exposition of the parked-facts
+// gauge (H10).
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	if s.ParkedFacts == nil {
+		return
+	}
+	n, err := s.ParkedFacts(r.Context())
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	_, _ = fmt.Fprintf(w, "# HELP customer_payments_parked_facts Fulfilment facts parked until their order is bound.\n"+
+		"# TYPE customer_payments_parked_facts gauge\ncustomer_payments_parked_facts %d\n", n)
 }

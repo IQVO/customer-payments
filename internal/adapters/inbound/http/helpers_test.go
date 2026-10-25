@@ -28,6 +28,9 @@ type env struct {
 	deps     usecases.Deps
 	ready    *httpadapter.Readiness
 	srv      *httptest.Server
+	api      *httpadapter.Server
+	router   http.Handler
+	gauge    func(context.Context) (int, error)
 	keys     int
 }
 
@@ -48,9 +51,11 @@ func newEnv(t *testing.T) *env {
 		GetRefund: usecases.GetRefund{Deps: deps}, ListRefunds: usecases.ListRefunds{Deps: deps},
 		IdempotencyStore: s.Idempotency(), Clock: clock, Readiness: ready,
 	}
-	srv := httptest.NewServer(httpadapter.NewRouter(api))
-	t.Cleanup(srv.Close)
-	return &env{t: t, store: s, clock: clock, provider: prov, deps: deps, ready: ready, srv: srv}
+	e := &env{t: t, store: s, clock: clock, provider: prov, deps: deps, ready: ready, api: api}
+	e.reroute()
+	e.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { e.router.ServeHTTP(w, r) }))
+	t.Cleanup(e.srv.Close)
+	return e
 }
 
 type reply struct {
@@ -141,4 +146,10 @@ func (e *env) shipped() string {
 		}
 	}
 	return id
+}
+
+// reroute rebuilds the router after a test changed the server's settings.
+func (e *env) reroute() {
+	e.api.ParkedFacts = e.gauge
+	e.router = httpadapter.NewRouter(e.api)
 }
