@@ -71,7 +71,7 @@ type Fact struct {
 // RefundOnReturnToSender for PackageReturned. A fact for an order that has no
 // authorization yet is parked and applied on bind (S4).
 func (c Consumer) ApplyFact(ctx context.Context, eventID, eventType string, f Fact) error {
-	if !shared.ValidID(f.OrderID) || f.GroupNo < 0 {
+	if !shared.ValidID(f.OrderID) || !validFact(f) {
 		return ErrInvalidEvent
 	}
 	return c.once(ctx, eventID, eventType, func(ctx context.Context) error {
@@ -110,4 +110,16 @@ func (c Consumer) once(ctx context.Context, eventID, eventType string, fn func(c
 		return struct{}{}, fn(ctx)
 	})
 	return err
+}
+
+// validFact checks the shape a fact needs: a group for the fulfilment facts,
+// exactly one tracking number for the package facts.
+func validFact(f Fact) bool {
+	switch f.Kind {
+	case parked.Lost, parked.Returned:
+		return len(f.TrackingNumbers) == 1 && f.TrackingNumbers[0] != ""
+	case parked.Shipped, parked.Cancelled, parked.Unsourceable:
+		return f.GroupNo >= 1 && f.GroupNo <= shared.MaxInt32
+	}
+	return false
 }
