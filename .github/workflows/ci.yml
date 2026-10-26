@@ -159,8 +159,8 @@ jobs:
           go-version-file: go.mod
       - name: Install gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
-      - name: Mutation testing (fast subset — authorization aggregate)
-        run: gremlins unleash ./internal/domain/authorization
+      - name: Mutation testing (every domain package)
+        run: for pkg in ./internal/domain/*/; do gremlins unleash "${pkg%/}" || exit 1; done
 
   mutation:
     runs-on: ubuntu-latest
@@ -177,7 +177,7 @@ jobs:
       - name: Install gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
       - name: Mutation testing (domain layer)
-        run: gremlins unleash ./internal/domain --workers 1 --timeout-coefficient 30
+        run: for pkg in ./internal/domain/*/; do gremlins unleash "${pkg%/}" --workers 1 --timeout-coefficient 30 || exit 1; done
       - name: Open or refresh the harness:red issue on a scheduled failure
         if: failure() && github.event_name == 'schedule'
         env:

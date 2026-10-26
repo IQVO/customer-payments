@@ -17,13 +17,13 @@ shared-broker reality has already caused a real incident once.
 ### 1. Is it actually cross-service?
 
 Not every domain event this service raises belongs on the wire. Check
-`internal/adapters/outbound/kafka/publisher.go`'s doc comment — this repo
+`internal/adapters/outbound/kafka/sink.go`'s doc comment — this repo
 forwards only `StockReserved`/`ReservationRevoked`; everything else is a
 local concern published only to the Postgres outbox
-(`internal/adapters/outbound/postgres/event_publisher.go`) for audit, not
+(`internal/adapters/outbound/postgres/outbox.go`) for audit, not
 broadcast. Before adding a new event to the Kafka publisher, confirm a
 sibling context genuinely needs to react to it — check
-`docs/docs/ddd/context-map.md` or the equivalent ubiquitous-language doc
+`docs/adr/0001-customer-payments-bounded-context.md` or the equivalent ubiquitous-language doc
 for who's actually downstream.
 
 ### 2. Envelope: CloudEvents 1.0, structured mode — MANDATORY
@@ -54,7 +54,7 @@ shape, no dual-write, no `EVENT_ENVELOPE_MODE` toggle (see
 lowercase except the final PascalCase event name — e.g.
 `com.warehouse.wms.inventory-storage.reservation.ReservationRevoked`. Take
 the subdomain/context segment from the subdomain table on warehouse-docs'
-Event Standard page (`docs/strategic-design/event-standard-cloudevents.md`);
+Event Standard page (`docs/adr/0003-cloudevents-envelope-and-type-catalogue.md`);
 don't guess it. The same `type` is used on the analytics topic; only
 `dataschema` changes (`…:analytics:<EventName>:v1`).
 
@@ -120,7 +120,7 @@ hardcoded `localhost:9092` fails CI).
 ### 1. Never import the sibling's Go packages
 
 This service knows a sibling's topic name, its exact CloudEvents `type`
-strings and payload shape ONLY — never its Go types. See `internal/adapters/outbound/facilitycache/consumer.go`'s
+strings and payload shape ONLY — never its Go types. See `internal/adapters/inbound/kafka/handlers.go`'s
 own doc comment: "This service has no business knowing anything else
 about that context beyond this topic name and the envelope/payload shapes
 below." Hand-mirror the payload struct locally; do not add a Go module

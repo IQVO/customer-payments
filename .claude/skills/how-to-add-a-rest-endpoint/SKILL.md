@@ -13,7 +13,7 @@ HTTP handler before the domain invariant it enforces produces handlers
 that validate nothing and use cases that get bypassed.
 
 This walks the exact path `POST /bins/{binId}/cycle-count` took
-(`internal/application/usecases/run_cycle_count.go` +
+(`internal/application/usecases/authorization.go` +
 `internal/adapters/inbound/http/server.go`'s `handleRunCycleCount`) as the
 concrete worked example — read those two files alongside this guide.
 
@@ -112,7 +112,7 @@ npm run gen-api-docs
 
 If this endpoint is user-facing behaviour (not purely internal
 plumbing), add a `.feature` file under `features/` exercising it
-end-to-end against the real HTTP server — see `features/cycle_count.feature`
+end-to-end against the real HTTP server — see `features/authorization.feature`
 for the exact shape this repo's `bdd` CI job expects (Given/When/Then over
 real HTTP, not mocked).
 

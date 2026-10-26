@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  title: Customer Payments API (proposed)
+  version: 0.1.0-proposed
+  contact:
+    name: customer-payments maintainers
+    url: https://github.com/IQVO/customer-payments
+  description: >-
+    Proposed REST contract of the customer-payments bounded context of the
+    digital storefront, derived from storefront/model/model.yaml
+    (contexts[customer-payments].rest). Nothing is built yet. Customer
+    Payments moves money with the shipment facts: authorize at checkout,
+    capture each shipment group's allocation when it ships
+    (FulfillmentShipped), release on cancellation (FulfillmentCancelled),
+    refund on lost or returned packages (PackageLost, PackageReturned), and
+    re-authorize uncaptured allocations before the provider's authorization
+    validity expires. The provider is reached through an ACL port (Authorize,
+    Capture, Void, Refund, Reauthorize) with deterministic idempotency keys
+    per (operation, authorizationId, groupNo); the storefront never sees a
+    card number, only PSP tokens. This surface is called by checkout
+    (authorize, void) and by storefront ops (refunds, reads); captures,
+    releases and re-authorizations arrive as Kafka events or policies, never
+    as REST writes. Errors are RFC 9457 problem details
+    (application/problem+json) whose type is /problems/<slug>; shared types
+    are not-found (404), illegal-transition (409), concurrent-update (409)
+    and validation-failed (422), plus one kebab-case slug per Err of the
+    model. Every write takes an Idempotency-Key header. No authentication.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Authorizations
+    description: One PaymentAuthorization per checkout session, with allocations per shipment group.
+  - name: Refunds
+    description: Refunds for lost or returned packages, or manual (ops only).
+paths:
+  /payment-authorizations:
+    post:
+      tags: [Authorizations]
+      operationId: authorizePayment
+      summary: Authorize the quote total of a checkout session
+      description: >-
+        AuthorizePayment. One authorization per checkout session
+        (ErrDuplicateAuthorization; a replay with the same Idempotency-Key
+        returns the existing one). checkout calls this with key
+        <sessionId>:auth and one allocation per shipment group; allocations
+        must sum to the authorized total and name the session's groups
+        (ErrAllocationMismatch). On a provider decline the record is DECLINED
+        (terminal) and the checkout session stays open for another token.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeRequest'
+      responses:
+        '201':
+          description: The authorization (AUTHORIZED or DECLINED).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAuthorization'
+        '409':
+          description: duplicate-authorization (ErrDuplicateAuthorization) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: validation-failed or allocation-mismatch (ErrAllocationMismatch).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key; provider keys are deterministic.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    get:
+      tags: [Authorizations]
+      operationId: listPaymentAuthorizations
+      summary: List authorizations by order or checkout session
+      description: ListAuthorizations. Exactly one of orderId or checkoutSessionId is required.
+      parameters:
+        - name: orderId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: checkoutSessionId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The matching authorizations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAuthorizationList'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /payment-authorizations/{authorizationId}:
+    get:
+      tags: [Authorizations]
+      operationId: getPaymentAuthorization
+      summary: Get one authorization with its allocations
+      description: GetAuthorization.
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationId'
+      responses:
+        '200':
+          description: The authorization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAuthorization'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /payment-authorizations/{authorizationId}:void:
+    post:
+      tags: [Authorizations]
+      operationId: voidPaymentAuthorization
+      summary: Void an uncaptured authorization
+      description: >-
+        VoidAuthorization. checkout calls this with key <sessionId>:void, and
+        only after a definitive rejection of the place-order step (never
+        while the outcome is in doubt; that side is guarded by checkout's
+        ErrPlacementInDoubt). VoidUnboundAuthorizations also voids an
+        authorization that no CheckoutCompleted bound within 24 h.
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The voided authorization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAuthorization'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: illegal-transition (already captured, voided or expired) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /refunds:
+    post:
+      tags: [Refunds]
+      operationId: requestRefund
+      summary: Request a manual refund (ops only)
+      description: >-
+        RequestRefund, the ops route. Automatic refunds come from the
+        RefundOnLostPackage and RefundOnReturnToSender policies. Refunds of an
+        order never exceed its captured total (ErrOverRefund).
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+      responses:
+        '201':
+          description: The requested refund (REQUESTED).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '409':
+          description: over-refund (ErrOverRefund) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    get:
+      tags: [Refunds]
+      operationId: listRefunds
+      summary: List refunds of an order
+      description: ListRefunds.
+      parameters:
+        - name: orderId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The matching refunds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundList'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: A repeated key returns the stored response of the first call.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    AuthorizationId:
+      name: authorizationId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: not-found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unprocessable:
+      description: validation-failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: Problem type slug, for example over-refund.
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+    Allocation:
+      type: object
+      required: [groupNo, amountMinor, state]
+      properties:
+        groupNo:
+          type: integer
+          minimum: 1
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        state:
+          type: string
+          enum: [PENDING, CAPTURED, RELEASED]
+    AllocationInput:
+      type: object
+      required: [groupNo, amountMinor]
+      properties:
+        groupNo:
+          type: integer
+          minimum: 1
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 0
+    AuthorizeRequest:
+      type: object
+      required: [checkoutSessionId, paymentMethodToken, currency, totalMinor, allocations]
+      properties:
+        checkoutSessionId:
+          type: string
+        paymentMethodToken:
+          type: string
+          description: The PSP token; never a card number.
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        totalMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        allocations:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/AllocationInput'
+    PaymentAuthorization:
+      type: object
+      required: [authorizationId, checkoutSessionId, state, currency, totalMinor, allocations]
+      properties:
+        authorizationId:
+          type: string
+        checkoutSessionId:
+          type: string
+        orderId:
+          type: string
+          nullable: true
+          description: Bound on CheckoutCompleted (BindOrderOnCheckoutCompleted).
+        state:
+          type: string
+          enum: [AUTHORIZED, PARTIALLY_CAPTURED, CAPTURED, VOIDED, EXPIRED, DECLINED]
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        totalMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Allocation'
+        providerAuthorizationId:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+    PaymentAuthorizationList:
+      type: object
+      required: [authorizations]
+      properties:
+        authorizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentAuthorization'
+    RefundRequest:
+      type: object
+      required: [orderId, amountMinor, reason]
+      properties:
+        orderId:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          enum: [LOST, RETURNED_TO_SENDER, MANUAL]
+    Refund:
+      type: object
+      required: [refundId, orderId, amountMinor, reason, state]
+      properties:
+        refundId:
+          type: string
+        orderId:
+          type: string
+        amountMinor:
+          type: integer
+          format: int64
+          minimum: 1
+        reason:
+          type: string
+          enum: [LOST, RETURNED_TO_SENDER, MANUAL]
+        state:
+          type: string
+          enum: [REQUESTED, SUCCEEDED, FAILED]
+    RefundList:
+      type: object
+      required: [refunds]
+      properties:
+        refunds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Refund'
