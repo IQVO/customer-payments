@@ -27,5 +27,8 @@ unleash:
     # differs. See HARNESS.md's mutation-testing section for the
     # tagless-switch-under-reports pitfall before assuming a low number
     # means missing tests.
-    efficacy: "0"
-    mutant-coverage: "0"
+    efficacy: "85"
+    mutant-coverage: "85"
+    # Measured 2026-10-26 per package (efficacy / mutator coverage):
+    #   paymentauthorization 85.94 / 85.33, refund 86.05 / 100, shared 100 / 100.
+    # Both floors sit just below the lowest measurement.
