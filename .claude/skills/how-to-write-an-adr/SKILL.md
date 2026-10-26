@@ -15,10 +15,10 @@ addition inside an already-decided architecture doesn't.
 
 ## Numbering and location
 
-`docs/docs/adr/NNNN-kebab-case-title.md`, four-digit zero-padded,
+`docs/adr/NNNN-kebab-case-title.md`, four-digit zero-padded,
 sequential — check the highest existing number
-(`git ls-tree --name-only origin/develop -- docs/docs/adr/` and pick the
-next integer, never reuse or guess). `docs/docs/adr/about.md` explains the
+(`git ls-tree --name-only origin/develop -- docs/adr/` and pick the
+next integer, never reuse or guess). `docs/adr/0001-customer-payments-bounded-context.md` explains the
 format to readers; you don't need to touch it when adding a new ADR.
 
 ## Frontmatter (Docusaurus needs all five fields)
@@ -70,7 +70,7 @@ lists benefits reads as marketing, not a decision record.
 ```
 
 The `## Decision` section is the part worth the most editing effort: see
-ADR-0013 (`docs/docs/adr/0013-location-classification-via-facility-events.md`)
+ADR 0003 (`docs/adr/0003-cloudevents-envelope-and-type-catalogue.md`)
 for a model example — it states the exact mechanism (event-fed local
 cache replacing a synchronous HTTP read), names the readiness-gate design,
 and is specific enough that Task "how-to-add-an-integration-event"'s

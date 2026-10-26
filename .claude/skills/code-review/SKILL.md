@@ -54,7 +54,7 @@ linter already catches.
    accidental (an agent "helpfully" adding back something that looks
    missing) and should be flagged even if the code itself looks correct.
 8. **Anything that would surprise the sibling-context boundary.** If this
-   repo's `AGENTS.md`/`CLAUDE.md` documents a stricter rule (e.g. "no
+   repo's `HARNESS.md` documents a stricter rule (e.g. "no
    outbound calls to sibling contexts"), check the diff doesn't
    reintroduce exactly that.
 
