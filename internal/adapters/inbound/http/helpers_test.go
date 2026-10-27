@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -32,9 +33,14 @@ type env struct {
 	router   http.Handler
 	gauge    func(context.Context) (int, error)
 	keys     int
+	logger   *slog.Logger
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *env { return newEnvLogged(t, slog.New(slog.DiscardHandler)) }
+
+// newEnvLogged is newEnv with the router's request logger set (newEnv discards
+// it so the access lines do not flood the test output).
+func newEnvLogged(t *testing.T, logger *slog.Logger) *env {
 	t.Helper()
 	clock := memory.NewClock(t0)
 	s := memory.NewStore(clock)
@@ -51,7 +57,7 @@ func newEnv(t *testing.T) *env {
 		GetRefund: usecases.GetRefund{Deps: deps}, ListRefunds: usecases.ListRefunds{Deps: deps},
 		IdempotencyStore: s.Idempotency(), Clock: clock, Readiness: ready,
 	}
-	e := &env{t: t, store: s, clock: clock, provider: prov, deps: deps, ready: ready, api: api}
+	e := &env{t: t, store: s, clock: clock, provider: prov, deps: deps, ready: ready, api: api, logger: logger}
 	e.reroute()
 	e.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { e.router.ServeHTTP(w, r) }))
 	t.Cleanup(e.srv.Close)
@@ -151,5 +157,5 @@ func (e *env) shipped() string {
 // reroute rebuilds the router after a test changed the server's settings.
 func (e *env) reroute() {
 	e.api.ParkedFacts = e.gauge
-	e.router = httpadapter.NewRouter(e.api)
+	e.router = httpadapter.NewRouter(e.api, e.logger, "")
 }

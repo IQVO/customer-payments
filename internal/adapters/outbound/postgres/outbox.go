@@ -66,7 +66,7 @@ func (r *OutboxRepo) Append(ctx context.Context, events ...shared.Event) error {
 	if err != nil {
 		return err
 	}
-	return r.Insert(ctx, msgs...)
+	return r.Insert(ctx, withTraceHeaders(ctx, msgs)...)
 }
 
 // Insert stores msgs as unpublished rows.
