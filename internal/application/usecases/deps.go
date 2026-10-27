@@ -42,6 +42,9 @@ type Deps struct {
 	// Log receives the events a consumer skipped and the operator alerts; nil
 	// discards them.
 	Log *slog.Logger
+	// Metrics records the business outcome of each authorization attempt; nil
+	// records nothing, so unit tests need no wiring.
+	Metrics ports.PaymentMetrics
 }
 
 const (
@@ -68,6 +71,21 @@ func (d Deps) logger() *slog.Logger {
 	}
 	return slog.New(slog.DiscardHandler)
 }
+
+// metrics returns the configured PaymentMetrics or a no-op.
+func (d Deps) metrics() ports.PaymentMetrics {
+	if d.Metrics != nil {
+		return d.Metrics
+	}
+	return noMetrics{}
+}
+
+// noMetrics is the PaymentMetrics of a Deps without one.
+type noMetrics struct{}
+
+func (noMetrics) AuthorizationAuthorized(context.Context)       {}
+func (noMetrics) AuthorizationDeclined(context.Context, string) {}
+func (noMetrics) AuthorizationFailed(context.Context, string)   {}
 
 func (d Deps) reauthLead() time.Duration {
 	if d.ReauthLead > 0 {
