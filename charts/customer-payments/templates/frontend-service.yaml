@@ -1,0 +1,24 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "customer-ordering.frontendFullname" . }}
+  labels:
+    {{- include "customer-ordering.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  # ClusterIP only, always. The Nginx web gateway in warehouse-infra is the
+  # single host-exposed frontend endpoint; giving this Service a NodePort would
+  # create a second, unpoliced way into the SPA.
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  # component=frontend pins the Service to the frontend Deployment's pods
+  # only (tests/test_service_selectors.py).
+  selector:
+    {{- include "customer-ordering.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+{{- end }}

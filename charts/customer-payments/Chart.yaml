@@ -1,0 +1,12 @@
+apiVersion: v2
+name: customer-ordering
+description: Customer Ordering - turns a cart into a customer order (promise per shipment group, ship-to, status and tracking, cancellation); publishes CustomerOrderPlaced and CustomerOrderCancelled on retailnetwork.customer-ordering.events
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/IQVO/customer-ordering
+keywords:
+  - ddd
+  - hexagonal-architecture
+  - retail-network
+  - golang

@@ -1,0 +1,277 @@
+# Default values for customer-ordering. One component: the api Deployment
+# (cmd/api: REST, the outbox relay and three Kafka consumers in one process).
+# The chart refuses to render without the mandatory values below (named in the
+# failure): database.*, kafka.brokers, config.deliveryPromiseUrl and the three
+# config.*ConsumerGroup ids.
+
+replicaCount: 1
+
+# The image is built from this repository's Dockerfile (ENTRYPOINT ./api,
+# user 1000, port 8080, root filesystem never written).
+image:
+  repository: ghcr.io/iqvo/customer-ordering
+  pullPolicy: IfNotPresent
+  # Empty = "v" + the chart's appVersion (the release job tags the image v<version>).
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# The image runs as uid/gid 1000 (Dockerfile USER 1000).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Optional exposure, default off. Both route to the api Service only.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: customer-ordering.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+gatewayApi:
+  enabled: false
+  parentRefs:
+    - name: ""
+      namespace: ""
+      sectionName: "http"
+  hosts:
+    - path: /
+      pathType: PathPrefix
+  stripPath: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# HorizontalPodAutoscaler (autoscaling/v2), default off. When enabled the
+# Deployment omits replicas so the HPA owns them. N>1 is safe for the outbox
+# relay (row claims), the version-guarded order writes (concurrent-update on
+# conflict) and the consumers (stable groups, inbox dedupe on the CloudEvents id
+# in the same transaction); it has not been load-tested.
+autoscaling:
+  api:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+# Environment read by cmd/api (cmd/api/config.go, cmd/api/main.go). Every key
+# maps 1:1 to one variable; nothing else is rendered.
+config:
+  httpAddr: ":8080"                    # HTTP_ADDR (its port must equal service.targetPort)
+  logLevel: "info"                     # LOG_LEVEL: debug | info | warn (or warning) | error
+  # DELIVERY_PROMISE_URL: base URL of delivery-promise, the one synchronous
+  # call (quote, make, confirm and the compensating cancel). REQUIRED.
+  deliveryPromiseUrl: ""
+  # DELIVERY_PROMISE_TIMEOUT: Go duration per call. Empty = not rendered; the
+  # binary defaults to 5s.
+  deliveryPromiseTimeout: ""
+  # The three consumers always run, each under a STABLE, service-prefixed group
+  # id that comes from here, never from the pod name (a rescheduled pod must
+  # resume from its committed offsets). All REQUIRED; the chart refuses an empty
+  # one and refuses *_CONSUMER_GROUP in extraEnv. Suggested:
+  # customer-ordering-delivery-promise, customer-ordering-order-sourcing,
+  # customer-ordering-shipping (PackageLost/PackageReturned share the last one).
+  deliveryPromiseConsumerGroup: ""     # DELIVERY_PROMISE_CONSUMER_GROUP
+  orderSourcingConsumerGroup: ""       # ORDER_SOURCING_CONSUMER_GROUP
+  shippingConsumerGroup: ""            # SHIPPING_CONSUMER_GROUP
+  # OUTBOX_RELAY_INTERVAL: Go duration or plain seconds. Empty = not rendered
+  # (the binary defaults to 1s).
+  outboxRelayInterval: ""
+  # OUTBOX_MAX_ATTEMPTS: failures before the relay excludes an outbox row so a
+  # poison row cannot block it; re-arm with
+  # `UPDATE outbox_events SET attempts = 0 WHERE id = ...`. 0 = unlimited.
+  outboxMaxAttempts: 20
+  # SHUTDOWN_DRAIN_DELAY: wait after /readyz flips before the listener closes.
+  # Empty = not rendered (the binary defaults to 5s). Whole seconds ("5s"),
+  # minutes ("1m") or "0"; the chart needs the number to size the grace period.
+  shutdownDrainDelay: ""
+
+# The chart refuses to render unless database.url or database.existingSecret is
+# set. DATABASE_URL always comes from a Secret (secretKeyRef), never from the
+# ConfigMap.
+database:
+  # A DSN the chart stores in a Secret it creates. Prefer existingSecret.
+  url: ""
+  existingSecret: ""
+  existingSecretKey: "DATABASE_URL"
+  # Key, in the same Secret, of a DIRECT (non-pooled, session-mode) DSN used only
+  # for the boot migrations (MIGRATIONS_DATABASE_URL), `optional: true` so a
+  # Secret without it still starts the pod (the binary falls back to
+  # DATABASE_URL). With database.url set, migrationsUrl fills it.
+  migrationsExistingSecretKey: "MIGRATIONS_DATABASE_URL"
+  migrationsUrl: ""
+
+# KAFKA_BROKERS (comma-separated) is MANDATORY: outbox relay, the three
+# consumers and /readyz dial Kafka. Produced topic:
+# retailnetwork.customer-ordering.events; consumed:
+# retailnetwork.delivery-promise.events, retailnetwork.order-sourcing.events and
+# retailnetwork.shipping-and-tracking.events (dead letters on <topic>.dlq).
+kafka:
+  brokers: ""
+
+# Observability (ADR 0007): the fleet pipeline is pod --OTLP/gRPC--> Collector
+# --> Jaeger (traces) and Prometheus (metrics); logs are stdout JSON for Alloy
+# and Loki. Export never blocks, so a Collector that is down costs telemetry and
+# nothing else, but otel.enabled=false renders no OTEL_* env at all (the binaries
+# then fall back to localhost:4317). serviceName is OTEL_SERVICE_NAME of the api;
+# the mcp component gets "<serviceName>-mcp". SERVICE_VERSION is the image tag
+# (appVersion when empty), ENVIRONMENT is `environment`.
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "customer-ordering"
+
+# ENVIRONMENT of the api: deployment.environment.name on every span, metric and
+# log of the api. (mcp.environment sets the same for the mcp component.)
+environment: "production"
+
+# Extra env vars appended to the api container as a raw list. The chart refuses
+# any *_MODE variable (this service has no mode: Postgres and Kafka are the only
+# runtime), any variable the chart renders itself and any *_CONSUMER_GROUP (the
+# group ids are config.* values).
+extraEnv: []
+
+# The Postgres dial and the migrations at boot run inside a bounded retry
+# (internal/bootretry), so the startup probe allows ~60s.
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 2
+  failureThreshold: 30
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+# Room for the binary's sequential graceful shutdown (cmd/api/main.go):
+# SHUTDOWN_DRAIN_DELAY (5s) + HTTP drain (10s) + each of the 3 consumers awaited
+# up to 10s one after the other (30s) + the outbox relay (10s) = 55s worst case.
+# The chart refuses anything that does not exceed that sum for the configured
+# drain delay (a shorter period SIGKILLs a consumer or the relay mid-drain).
+terminationGracePeriodSeconds: 60
+
+# The optional MCP server (ADR 0005): cmd/mcp, a read-only second deployable
+# over the SAME read use cases the REST adapter serves (get_order,
+# get_order_tracking, get_ship_to). Never dials Kafka, runs no consumer and
+# no relay, calls no sibling context, and has NO auth (fleet-wide revert
+# 2026-09-11): access control is the in-cluster ClusterIP boundary. Needs
+# database.* like the api (the same Secret), nothing else.
+mcp:
+  enabled: false
+  replicaCount: 1
+  httpAddr: ":8090"                  # MCP_ADDR (Streamable HTTP /mcp + /healthz)
+  # SERVICE_VERSION / ENVIRONMENT: the labels cmd/mcp reports at boot and puts on
+  # its telemetry. serviceVersion empty = the image tag (appVersion when empty),
+  # like the api; set it only to override.
+  serviceVersion: ""
+  environment: "production"
+  service:
+    type: ClusterIP
+    port: 8090
+    targetPort: 8090
+  # Gateway exposure: /api/mcp/customer-ordering -> Service :8090, prefix
+  # rewritten to /mcp (the SDK's canonical endpoint). Needs the Gateway
+  # parentRef from warehouse-infra; NO auth of any kind on the route.
+  route:
+    enabled: false
+    path: "/api/mcp/customer-ordering"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# web/ (customer_ordering_mfe, ADR 0006): the Module Federation remote served
+# by its own nginx pod, reached through warehouse-infra's Nginx web gateway at
+# /mfes/customer-ordering/. Never routed by this chart; ClusterIP only. No
+# env at all: the SPA resolves its API base from the console's runtime
+# /config.json.
+frontend:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: ghcr.io/iqvo/customer-ordering-frontend
+    pullPolicy: IfNotPresent
+    # Empty = the chart's appVersion (warehouse-infra overrides repository and
+    # tag with a content-derived local-<hash> tag in the kind cluster).
+    tag: ""
+  service:
+    port: 80
+    targetPort: 8080
+  # nginx-unprivileged runs as uid 101.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    fsGroup: 101
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

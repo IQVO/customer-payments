@@ -1,0 +1,28 @@
+{{ .Chart.Name }} has been deployed.
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Service:   {{ include "customer-ordering.fullname" . }} ({{ .Values.service.type }}, port {{ .Values.service.port }})
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+Ingress:   http://{{ .host }}{{ (index .paths 0).path }}
+{{- end }}
+{{- else if .Values.gatewayApi.enabled }}
+Gateway API HTTPRoute enabled - routed via the parentRefs/hosts configured in gatewayApi.*.
+{{- else }}
+To reach it locally:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "customer-ordering.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080/healthz
+{{- end }}
+
+CustomerOrderPlaced and CustomerOrderCancelled are relayed from the transactional
+outbox onto retailnetwork.customer-ordering.events ({{ .Values.kafka.brokers }}).
+Postgres and Kafka are the only runtime; checkout calls delivery-promise at
+{{ .Values.config.deliveryPromiseUrl }}.
+
+The three consumers are ON, each under a stable group id:
+  delivery-promise       group {{ .Values.config.deliveryPromiseConsumerGroup }}, topic retailnetwork.delivery-promise.events
+  order-sourcing         group {{ .Values.config.orderSourcingConsumerGroup }}, topic retailnetwork.order-sourcing.events
+  shipping-and-tracking  group {{ .Values.config.shippingConsumerGroup }}, topic retailnetwork.shipping-and-tracking.events

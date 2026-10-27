@@ -1,0 +1,162 @@
+{{- include "customer-ordering.requireRealRuntime" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "customer-ordering.fullname" . }}
+  labels:
+    {{- include "customer-ordering.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.autoscaling.api.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "customer-ordering.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "customer-ordering.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "customer-ordering.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "customer-ordering.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          # Every non-secret config.* value also reaches cmd/api through the
+          # chart ConfigMap; the explicit `env` entries below win over envFrom
+          # for the same key and carry the same values. The checksum/config
+          # annotation above rolls the pods when the ConfigMap changes.
+          # tests/render_test.sh asserts the mount and that every variable
+          # cmd/api reads is rendered.
+          envFrom:
+            - configMapRef:
+                name: {{ include "customer-ordering.fullname" . }}
+          # The env contract is cmd/api/main.go's header comment. A value with a
+          # dedicated chart key is rendered here, never through extraEnv.
+          env:
+            - name: HTTP_ADDR
+              value: {{ .Values.config.httpAddr | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # The one synchronous dependency: quote, make, confirm, cancel.
+            - name: DELIVERY_PROMISE_URL
+              value: {{ .Values.config.deliveryPromiseUrl | quote }}
+            {{- if ne (toString .Values.config.deliveryPromiseTimeout) "" }}
+            - name: DELIVERY_PROMISE_TIMEOUT
+              value: {{ .Values.config.deliveryPromiseTimeout | quote }}
+            {{- end }}
+            # The three consumers always run. The group ids come from values,
+            # never a literal and never the pod name, and are mandatory (the
+            # chart refuses an empty one): a stable id is what makes a
+            # rescheduled pod resume from its committed offsets.
+            - name: DELIVERY_PROMISE_CONSUMER_GROUP
+              value: {{ .Values.config.deliveryPromiseConsumerGroup | quote }}
+            - name: ORDER_SOURCING_CONSUMER_GROUP
+              value: {{ .Values.config.orderSourcingConsumerGroup | quote }}
+            - name: SHIPPING_CONSUMER_GROUP
+              value: {{ .Values.config.shippingConsumerGroup | quote }}
+            {{- if ne (toString .Values.config.outboxRelayInterval) "" }}
+            - name: OUTBOX_RELAY_INTERVAL
+              value: {{ .Values.config.outboxRelayInterval | quote }}
+            {{- end }}
+            # The relay excludes a row after this many failures (0 = unlimited).
+            - name: OUTBOX_MAX_ATTEMPTS
+              value: {{ .Values.config.outboxMaxAttempts | quote }}
+            {{- if ne (toString .Values.config.shutdownDrainDelay) "" }}
+            - name: SHUTDOWN_DRAIN_DELAY
+              value: {{ .Values.config.shutdownDrainDelay | quote }}
+            {{- end }}
+            # Observability env (STANDARD item 7): the same three for every
+            # component, plus ENVIRONMENT for deployment.environment.name.
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | quote }}
+            {{- end }}
+            # DATABASE_URL always comes from a Secret.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-ordering.databaseSecretName" . }}
+                  key: {{ .Values.database.existingSecretKey }}
+            {{- if .Values.database.migrationsExistingSecretKey }}
+            # A direct (non-pooled) DSN used only for the boot migrations.
+            # `optional: true` so a Secret without this key still starts the
+            # pod: the binary falls back to DATABASE_URL.
+            - name: MIGRATIONS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-ordering.databaseSecretName" . }}
+                  key: {{ .Values.database.migrationsExistingSecretKey }}
+                  optional: true
+            {{- end }}
+            # Mandatory: the relay, the three consumers and /readyz dial Kafka.
+            - name: KAFKA_BROKERS
+              value: {{ .Values.kafka.brokers | quote }}
+            {{- range .Values.extraEnv }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # The service writes nothing to disk and the root filesystem is
+          # read-only; /tmp is a small scratch volume for the runtime.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
