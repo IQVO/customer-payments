@@ -15,7 +15,7 @@ import (
 
 func readyzStatus(t *testing.T, g *httpadapter.Readiness) (int, string) {
 	t.Helper()
-	srv := httptest.NewServer(httpadapter.NewRouter(&httpadapter.Server{Readiness: g}))
+	srv := httptest.NewServer(httpadapter.NewRouter(&httpadapter.Server{Readiness: g}, nil, ""))
 	defer srv.Close()
 	resp, err := http.Get(srv.URL + "/readyz")
 	if err != nil {

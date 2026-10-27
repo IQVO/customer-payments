@@ -61,7 +61,7 @@ func newWorld() *world {
 		GetRefund: usecases.GetRefund{Deps: deps}, ListRefunds: usecases.ListRefunds{Deps: deps},
 		IdempotencyStore: s.Idempotency(), Clock: clock, Readiness: httpadapter.NewReadiness(0, 0),
 	}
-	return &world{deps: deps, provider: prov, srv: httptest.NewServer(httpadapter.NewRouter(api))}
+	return &world{deps: deps, provider: prov, srv: httptest.NewServer(httpadapter.NewRouter(api, nil, ""))}
 }
 
 func (w *world) consumer() usecases.Consumer { return usecases.Consumer{Deps: w.deps} }
