@@ -108,9 +108,9 @@ config:
   # one and refuses *_CONSUMER_GROUP in extraEnv. Suggested:
   # customer-payments-checkout, customer-payments-order-sourcing,
   # customer-payments-shipping-and-tracking.
-  checkoutConsumerGroup: ""            # CHECKOUT_CONSUMER_GROUP
-  orderSourcingConsumerGroup: ""       # ORDER_SOURCING_CONSUMER_GROUP
-  shippingAndTrackingConsumerGroup: "" # SHIPPING_AND_TRACKING_CONSUMER_GROUP
+  checkoutConsumerGroup: ""             # CHECKOUT_CONSUMER_GROUP
+  orderSourcingConsumerGroup: ""        # ORDER_SOURCING_CONSUMER_GROUP
+  shippingAndTrackingConsumerGroup: ""  # SHIPPING_AND_TRACKING_CONSUMER_GROUP
   # OUTBOX_RELAY_INTERVAL: Go duration or plain seconds. Empty = not rendered
   # (the binary defaults to 1s).
   outboxRelayInterval: ""
