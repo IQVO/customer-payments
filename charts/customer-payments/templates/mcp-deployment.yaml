@@ -37,10 +37,10 @@ spec:
             - name: http
               containerPort: {{ .Values.mcp.service.targetPort }}
               protocol: TCP
-          # Env contract verified against cmd/mcp/main.go (the header comment
-          # and the getenv/os.Getenv calls): MCP_ADDR, LOG_LEVEL,
-          # SERVICE_VERSION, ENVIRONMENT, DATABASE_URL and (the boot migrations
-          # only) MIGRATIONS_DATABASE_URL. cmd/mcp has no auth env, starts no
+          # Env contract verified against cmd/mcp (main.go, telemetry.go):
+          # MCP_ADDR, LOG_LEVEL, SERVICE_VERSION, ENVIRONMENT,
+          # OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT, DATABASE_URL and
+          # (the boot migrations only) MIGRATIONS_DATABASE_URL. cmd/mcp has no auth env, starts no
           # outbox relay, runs none of the three consumers and no policy loop,
           # never dials Kafka (no KAFKA_BROKERS, no consumer groups here) and
           # never calls the payment provider: it is read-only.
@@ -53,6 +53,12 @@ spec:
               value: {{ .Values.mcp.serviceVersion | default .Values.image.tag | default .Chart.AppVersion | quote }}
             - name: ENVIRONMENT
               value: {{ .Values.mcp.environment | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ printf "%s-mcp" .Values.otel.serviceName | quote }}
+            {{- end }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

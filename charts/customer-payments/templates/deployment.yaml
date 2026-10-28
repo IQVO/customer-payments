@@ -92,6 +92,18 @@ spec:
             - name: SHUTDOWN_DRAIN_DELAY
               value: {{ .Values.config.shutdownDrainDelay | quote }}
             {{- end }}
+            # Observability env (ADR 0004): the same three for every
+            # component, plus ENVIRONMENT for deployment.environment.name.
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | quote }}
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | quote }}
+            {{- end }}
             # DATABASE_URL always comes from a Secret.
             - name: DATABASE_URL
               valueFrom:

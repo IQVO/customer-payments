@@ -150,6 +150,22 @@ database:
 kafka:
   brokers: ""
 
+# Observability (ADR 0004): the fleet pipeline is pod --OTLP/gRPC--> Collector
+# --> Jaeger (traces) and Prometheus (metrics); logs are stdout JSON for Alloy
+# and Loki. Export never blocks, so a Collector that is down costs telemetry and
+# nothing else, but otel.enabled=false renders no OTEL_* env at all (the binaries
+# then fall back to localhost:4317). serviceName is OTEL_SERVICE_NAME of the api;
+# the mcp component gets "<serviceName>-mcp". SERVICE_VERSION is the image tag
+# (appVersion when empty), ENVIRONMENT is `environment`.
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "customer-payments"
+
+# ENVIRONMENT of the api: deployment.environment.name on every span, metric and
+# log of the api. (mcp.environment sets the same for the mcp component.)
+environment: "production"
+
 # Extra env vars appended to the api container as a raw list. The chart refuses
 # any *_MODE variable (this service has no mode: Postgres and Kafka are the only
 # runtime), any variable the chart renders itself and any *_CONSUMER_GROUP (the

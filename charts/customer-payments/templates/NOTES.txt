@@ -17,12 +17,21 @@ To reach it locally:
   curl http://localhost:8080/healthz
 {{- end }}
 
-CustomerOrderPlaced and CustomerOrderCancelled are relayed from the transactional
-outbox onto retailnetwork.customer-payments.events ({{ .Values.kafka.brokers }}).
-Postgres and Kafka are the only runtime; checkout calls delivery-promise at
-{{ .Values.config.deliveryPromiseUrl }}.
+PaymentAuthorized, PaymentCaptured, PaymentReleased, PaymentDeclined,
+PaymentReauthorized, PaymentAuthorizationExpired, RefundIssued and RefundFailed
+are relayed from the transactional outbox onto
+retailnetwork.customer-payments.events ({{ .Values.kafka.brokers }}). Postgres
+and Kafka are the only runtime; every money movement calls the payment provider
+at {{ .Values.config.paymentProviderUrl }}.
 
 The three consumers are ON, each under a stable group id:
-  delivery-promise       group {{ .Values.config.deliveryPromiseConsumerGroup }}, topic retailnetwork.delivery-promise.events
+  checkout               group {{ .Values.config.checkoutConsumerGroup }}, topic retailnetwork.checkout.events
   order-sourcing         group {{ .Values.config.orderSourcingConsumerGroup }}, topic retailnetwork.order-sourcing.events
-  shipping-and-tracking  group {{ .Values.config.shippingConsumerGroup }}, topic retailnetwork.shipping-and-tracking.events
+  shipping-and-tracking  group {{ .Values.config.shippingAndTrackingConsumerGroup }}, topic retailnetwork.shipping-and-tracking.events
+{{- if .Values.mcp.enabled }}
+
+MCP:       {{ include "customer-payments.mcpFullname" . }} ({{ .Values.mcp.service.type }}, port {{ .Values.mcp.service.port }}) - Streamable HTTP /mcp, read-only.
+{{- if .Values.mcp.route.enabled }}
+Route:     {{ .Values.mcp.route.path }} -> /mcp via the Gateway parentRefs.
+{{- end }}
+{{- end }}

@@ -1,13 +1,13 @@
 # Used by `helm lint` / `ct lint` (chart-testing): the chart refuses to render
 # without the mandatory values (database source, Kafka brokers, the
-# delivery-promise URL and the three consumer groups). Dummy DSN, no password;
+# payment-provider URL and the three consumer groups). Dummy DSN, no password;
 # nothing here is ever dialled.
 database:
   url: "postgres://u@example.invalid:5432/db"
 kafka:
   brokers: "kafka.example.invalid:9092"
 config:
-  deliveryPromiseUrl: "http://delivery-promise.example.invalid"
-  deliveryPromiseConsumerGroup: "customer-ordering-delivery-promise"
-  orderSourcingConsumerGroup: "customer-ordering-order-sourcing"
-  shippingConsumerGroup: "customer-ordering-shipping"
+  paymentProviderUrl: "http://payment-provider.example.invalid"
+  checkoutConsumerGroup: "customer-payments-checkout"
+  orderSourcingConsumerGroup: "customer-payments-order-sourcing"
+  shippingAndTrackingConsumerGroup: "customer-payments-shipping-and-tracking"

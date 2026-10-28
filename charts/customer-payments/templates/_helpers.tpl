@@ -137,7 +137,7 @@ service has no mode: Postgres and Kafka are the only runtime), no
 the chart renders itself (the same variable is never set twice).
 */}}
 {{- define "customer-payments.requireCleanExtraEnv" -}}
-{{- $owned := list "HTTP_ADDR" "LOG_LEVEL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "PAYMENT_PROVIDER_URL" "OUTBOX_RELAY_INTERVAL" "POLICY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" -}}
+{{- $owned := list "HTTP_ADDR" "LOG_LEVEL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "PAYMENT_PROVIDER_URL" "OUTBOX_RELAY_INTERVAL" "POLICY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}
