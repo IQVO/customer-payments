@@ -137,3 +137,18 @@ type IDGenerator interface {
 type Escalator interface {
 	Escalate(ctx context.Context, f parked.Fact) error
 }
+
+// PaymentMetrics records the business outcome of every authorization attempt
+// (Tier 2 of the fleet metrics convention). AuthorizePayment calls exactly one
+// method per attempt that reached a decision: AuthorizationAuthorized when the
+// hold was placed, AuthorizationDeclined when the provider refused it (reason is
+// the provider decline code), AuthorizationFailed for any other failure (reason
+// is a stable slug such as payment-provider-unavailable). A replay that returns
+// the session's existing authorization is not an attempt. The implementation
+// lives in internal/adapters/outbound/telemetry; a nil Deps.Metrics records
+// nothing.
+type PaymentMetrics interface {
+	AuthorizationAuthorized(ctx context.Context)
+	AuthorizationDeclined(ctx context.Context, reason string)
+	AuthorizationFailed(ctx context.Context, reason string)
+}
