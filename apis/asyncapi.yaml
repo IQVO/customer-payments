@@ -145,40 +145,29 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentAuthorized`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - authorizationId
-        - checkoutSessionId
-        - currency
-        - totalMinor
-        - allocations
-        - expiresAt
-        properties:
-          authorizationId:
-            type: string
-          checkoutSessionId:
-            type: string
-          currency:
-            type: string
-          totalMinor:
-            type: integer
-            minimum: 0
-          expiresAt:
-            type: string
-            format: date-time
-          allocations:
-            type: array
-            items:
-              type: object
+        $ref: '#/components/schemas/PaymentAuthorizedEvent'
       examples:
       - name: example
         payload:
-          authorizationId: pay-1
-          checkoutSessionId: cs-1
-          currency: BRL
-          totalMinor: 10000
-          expiresAt: '2026-10-31T09:00:00Z'
-          allocations: [{groupNo: 1, amountMinor: 7000}, {groupNo: 2, amountMinor: 3000}]
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentAuthorized
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:PaymentAuthorized:v1
+          data:
+            authorizationId: pay-1
+            checkoutSessionId: cs-1
+            currency: BRL
+            totalMinor: 10000
+            expiresAt: '2026-10-31T09:00:00Z'
+            allocations:
+            - groupNo: 1
+              amountMinor: 7000
+            - groupNo: 2
+              amountMinor: 3000
     PaymentCaptured:
       name: PaymentCaptured
       title: PaymentCaptured
@@ -186,29 +175,23 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentCaptured`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - authorizationId
-        - groupNo
-        - amountMinor
-        properties:
-          authorizationId:
-            type: string
-          orderId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
-          amountMinor:
-            type: integer
-            minimum: 0
+        $ref: '#/components/schemas/PaymentCapturedEvent'
       examples:
       - name: example
         payload:
-          authorizationId: pay-1
-          orderId: ord-1
-          groupNo: 1
-          amountMinor: 7000
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentCaptured
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:PaymentCaptured:v1
+          data:
+            authorizationId: pay-1
+            orderId: ord-1
+            groupNo: 1
+            amountMinor: 7000
     PaymentReleased:
       name: PaymentReleased
       title: PaymentReleased
@@ -216,34 +199,24 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentReleased`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - authorizationId
-        - groupNo
-        - amountMinor
-        - reason
-        properties:
-          authorizationId:
-            type: string
-          orderId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
-          amountMinor:
-            type: integer
-            minimum: 0
-          reason:
-            type: string
-            enum: [CANCELLED, UNSOURCEABLE, VOIDED, EXPIRED]
+        $ref: '#/components/schemas/PaymentReleasedEvent'
       examples:
       - name: example
         payload:
-          authorizationId: pay-1
-          orderId: ord-1
-          groupNo: 2
-          amountMinor: 3000
-          reason: CANCELLED
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentReleased
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:PaymentReleased:v1
+          data:
+            authorizationId: pay-1
+            orderId: ord-1
+            groupNo: 2
+            amountMinor: 3000
+            reason: CANCELLED
     PaymentAuthorizationExpired:
       name: PaymentAuthorizationExpired
       title: PaymentAuthorizationExpired
@@ -251,24 +224,22 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentAuthorizationExpired`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - authorizationId
-        - expiredAt
-        properties:
-          authorizationId:
-            type: string
-          orderId:
-            type: string
-          expiredAt:
-            type: string
-            format: date-time
+        $ref: '#/components/schemas/PaymentAuthorizationExpiredEvent'
       examples:
       - name: example
         payload:
-          authorizationId: pay-1
-          orderId: ord-1
-          expiredAt: '2026-10-24T09:00:00Z'
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentAuthorizationExpired
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:PaymentAuthorizationExpired:v1
+          data:
+            authorizationId: pay-1
+            orderId: ord-1
+            expiredAt: '2026-10-24T09:00:00Z'
     PaymentDeclined:
       name: PaymentDeclined
       title: PaymentDeclined
@@ -276,28 +247,23 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentDeclined`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - authorizationId
-        - reason
-        - at
-        properties:
-          authorizationId:
-            type: string
-          checkoutSessionId:
-            type: string
-          reason:
-            type: string
-          at:
-            type: string
-            format: date-time
+        $ref: '#/components/schemas/PaymentDeclinedEvent'
       examples:
       - name: example
         payload:
-          authorizationId: pay-1
-          checkoutSessionId: cs-1
-          reason: CARD_DECLINED
-          at: '2026-10-24T09:00:00Z'
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentDeclined
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:PaymentDeclined:v1
+          data:
+            authorizationId: pay-1
+            checkoutSessionId: cs-1
+            reason: CARD_DECLINED
+            at: '2026-10-24T09:00:00Z'
     PaymentReauthorized:
       name: PaymentReauthorized
       title: PaymentReauthorized
@@ -305,28 +271,23 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentReauthorized`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - authorizationId
-        - expiresAt
-        - providerAuthorizationId
-        properties:
-          authorizationId:
-            type: string
-          orderId:
-            type: string
-          expiresAt:
-            type: string
-            format: date-time
-          providerAuthorizationId:
-            type: string
+        $ref: '#/components/schemas/PaymentReauthorizedEvent'
       examples:
       - name: example
         payload:
-          authorizationId: pay-1
-          orderId: ord-1
-          expiresAt: '2026-11-07T09:00:00Z'
-          providerAuthorizationId: hold-2
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentReauthorized
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:PaymentReauthorized:v1
+          data:
+            authorizationId: pay-1
+            orderId: ord-1
+            expiresAt: '2026-11-07T09:00:00Z'
+            providerAuthorizationId: hold-2
     RefundIssued:
       name: RefundIssued
       title: RefundIssued
@@ -334,37 +295,25 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.refund.RefundIssued`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - refundId
-        - authorizationId
-        - amountMinor
-        - reason
-        properties:
-          refundId:
-            type: string
-          orderId:
-            type: string
-          authorizationId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
-          amountMinor:
-            type: integer
-            minimum: 0
-          reason:
-            type: string
-            enum: [LOST, RETURNED_TO_SENDER, MANUAL]
+        $ref: '#/components/schemas/RefundIssuedEvent'
       examples:
       - name: example
         payload:
-          refundId: ref-1
-          orderId: ord-1
-          authorizationId: pay-1
-          groupNo: 1
-          amountMinor: 7000
-          reason: LOST
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.refund.RefundIssued
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:RefundIssued:v1
+          data:
+            refundId: ref-1
+            orderId: ord-1
+            authorizationId: pay-1
+            groupNo: 1
+            amountMinor: 7000
+            reason: LOST
     RefundFailed:
       name: RefundFailed
       title: RefundFailed
@@ -372,40 +321,26 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.customer-payments.refund.RefundFailed`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - refundId
-        - authorizationId
-        - code
-        - attempts
-        - final
-        properties:
-          refundId:
-            type: string
-          orderId:
-            type: string
-          authorizationId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
-          code:
-            type: string
-          attempts:
-            type: integer
-            minimum: 1
-          final:
-            type: boolean
+        $ref: '#/components/schemas/RefundFailedEvent'
       examples:
       - name: example
         payload:
-          refundId: ref-1
-          orderId: ord-1
-          authorizationId: pay-1
-          groupNo: 1
-          code: ACCOUNT_CLOSED
-          attempts: 5
-          final: true
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/customer-payments
+          type: com.retailnetwork.storefront.customer-payments.refund.RefundFailed
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-payments:events:RefundFailed:v1
+          data:
+            refundId: ref-1
+            orderId: ord-1
+            authorizationId: pay-1
+            groupNo: 1
+            code: ACCOUNT_CLOSED
+            attempts: 5
+            final: true
     ConsumedCheckoutCompleted:
       name: CheckoutCompleted
       title: Consumed CheckoutCompleted
@@ -413,24 +348,22 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - sessionId
-        - orderId
-        - authorizationId
-        properties:
-          sessionId:
-            type: string
-          orderId:
-            type: string
-          authorizationId:
-            type: string
+        $ref: '#/components/schemas/ConsumedCheckoutCompletedEvent'
       examples:
       - name: example
         payload:
-          sessionId: cs-1
-          orderId: ord-1
-          authorizationId: pay-1
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/checkout
+          type: com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted
+          subject: pay-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:checkout:events:CheckoutCompleted:v1
+          data:
+            sessionId: cs-1
+            orderId: ord-1
+            authorizationId: pay-1
     ConsumedFulfillmentShipped:
       name: FulfillmentShipped
       title: Consumed FulfillmentShipped
@@ -438,31 +371,24 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentShipped`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - orderId
-        - groupNo
-        - trackingNumbers
-        properties:
-          orderId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
-          trackingNumbers:
-            type: array
-            items:
-              type: string
-          shippedAt:
-            type: string
-            format: date-time
+        $ref: '#/components/schemas/ConsumedFulfillmentShippedEvent'
       examples:
       - name: example
         payload:
-          orderId: ord-1
-          groupNo: 1
-          trackingNumbers: [TRK-1]
-          shippedAt: '2026-10-24T09:00:00Z'
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/order-sourcing
+          type: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentShipped
+          subject: ord-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:order-sourcing:events:FulfillmentShipped:v1
+          data:
+            orderId: ord-1
+            groupNo: 1
+            trackingNumbers:
+            - TRK-1
+            shippedAt: '2026-10-24T09:00:00Z'
     ConsumedFulfillmentCancelled:
       name: FulfillmentCancelled
       title: Consumed FulfillmentCancelled
@@ -470,21 +396,21 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentCancelled`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - orderId
-        - groupNo
-        properties:
-          orderId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
+        $ref: '#/components/schemas/ConsumedFulfillmentCancelledEvent'
       examples:
       - name: example
         payload:
-          orderId: ord-1
-          groupNo: 2
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/order-sourcing
+          type: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentCancelled
+          subject: ord-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:order-sourcing:events:FulfillmentCancelled:v1
+          data:
+            orderId: ord-1
+            groupNo: 2
     ConsumedFulfillmentUnsourceable:
       name: FulfillmentUnsourceable
       title: Consumed FulfillmentUnsourceable
@@ -492,21 +418,21 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentUnsourceable`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - orderId
-        - groupNo
-        properties:
-          orderId:
-            type: string
-          groupNo:
-            type: integer
-            minimum: 1
+        $ref: '#/components/schemas/ConsumedFulfillmentUnsourceableEvent'
       examples:
       - name: example
         payload:
-          orderId: ord-1
-          groupNo: 2
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/order-sourcing
+          type: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentUnsourceable
+          subject: ord-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:order-sourcing:events:FulfillmentUnsourceable:v1
+          data:
+            orderId: ord-1
+            groupNo: 2
     ConsumedPackageLost:
       name: PackageLost
       title: Consumed PackageLost
@@ -514,19 +440,21 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageLost`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - trackingNumber
-        properties:
-          orderId:
-            type: string
-          trackingNumber:
-            type: string
+        $ref: '#/components/schemas/ConsumedPackageLostEvent'
       examples:
       - name: example
         payload:
-          orderId: ord-1
-          trackingNumber: TRK-1
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageLost
+          subject: ord-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageLost:v1
+          data:
+            orderId: ord-1
+            trackingNumber: TRK-1
     ConsumedPackageReturned:
       name: PackageReturned
       title: Consumed PackageReturned
@@ -534,16 +462,815 @@ components:
       description: CloudEvents 1.0 structured event of type `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReturned`.
       contentType: application/cloudevents+json
       payload:
-        type: object
-        required:
-        - trackingNumber
-        properties:
-          orderId:
-            type: string
-          trackingNumber:
-            type: string
+        $ref: '#/components/schemas/ConsumedPackageReturnedEvent'
       examples:
       - name: example
         payload:
-          orderId: ord-1
-          trackingNumber: TRK-1
+          specversion: '1.0'
+          id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReturned
+          subject: ord-1
+          time: '2026-10-26T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageReturned:v1
+          data:
+            orderId: ord-1
+            trackingNumber: TRK-1
+  schemas:
+    PaymentAuthorizedData:
+      type: object
+      required:
+      - authorizationId
+      - checkoutSessionId
+      - currency
+      - totalMinor
+      - allocations
+      - expiresAt
+      properties:
+        authorizationId:
+          type: string
+        checkoutSessionId:
+          type: string
+        currency:
+          type: string
+        totalMinor:
+          type: integer
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
+        allocations:
+          type: array
+          items:
+            type: object
+      description: Wire payload (CloudEvents `data`, camelCase).
+    PaymentAuthorizedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentAuthorized
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:PaymentAuthorized:v1
+        data:
+          $ref: '#/components/schemas/PaymentAuthorizedData'
+    PaymentCapturedData:
+      type: object
+      required:
+      - authorizationId
+      - groupNo
+      - amountMinor
+      properties:
+        authorizationId:
+          type: string
+        orderId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+        amountMinor:
+          type: integer
+          minimum: 0
+      description: Wire payload (CloudEvents `data`, camelCase).
+    PaymentCapturedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentCaptured
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:PaymentCaptured:v1
+        data:
+          $ref: '#/components/schemas/PaymentCapturedData'
+    PaymentReleasedData:
+      type: object
+      required:
+      - authorizationId
+      - groupNo
+      - amountMinor
+      - reason
+      properties:
+        authorizationId:
+          type: string
+        orderId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+        amountMinor:
+          type: integer
+          minimum: 0
+        reason:
+          type: string
+          enum:
+          - CANCELLED
+          - UNSOURCEABLE
+          - VOIDED
+          - EXPIRED
+      description: Wire payload (CloudEvents `data`, camelCase).
+    PaymentReleasedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentReleased
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:PaymentReleased:v1
+        data:
+          $ref: '#/components/schemas/PaymentReleasedData'
+    PaymentAuthorizationExpiredData:
+      type: object
+      required:
+      - authorizationId
+      - expiredAt
+      properties:
+        authorizationId:
+          type: string
+        orderId:
+          type: string
+        expiredAt:
+          type: string
+          format: date-time
+      description: Wire payload (CloudEvents `data`, camelCase).
+    PaymentAuthorizationExpiredEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentAuthorizationExpired
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:PaymentAuthorizationExpired:v1
+        data:
+          $ref: '#/components/schemas/PaymentAuthorizationExpiredData'
+    PaymentDeclinedData:
+      type: object
+      required:
+      - authorizationId
+      - reason
+      - at
+      properties:
+        authorizationId:
+          type: string
+        checkoutSessionId:
+          type: string
+        reason:
+          type: string
+        at:
+          type: string
+          format: date-time
+      description: Wire payload (CloudEvents `data`, camelCase).
+    PaymentDeclinedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentDeclined
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:PaymentDeclined:v1
+        data:
+          $ref: '#/components/schemas/PaymentDeclinedData'
+    PaymentReauthorizedData:
+      type: object
+      required:
+      - authorizationId
+      - expiresAt
+      - providerAuthorizationId
+      properties:
+        authorizationId:
+          type: string
+        orderId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        providerAuthorizationId:
+          type: string
+      description: Wire payload (CloudEvents `data`, camelCase).
+    PaymentReauthorizedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.paymentauthorization.PaymentReauthorized
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:PaymentReauthorized:v1
+        data:
+          $ref: '#/components/schemas/PaymentReauthorizedData'
+    RefundIssuedData:
+      type: object
+      required:
+      - refundId
+      - authorizationId
+      - amountMinor
+      - reason
+      properties:
+        refundId:
+          type: string
+        orderId:
+          type: string
+        authorizationId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+        amountMinor:
+          type: integer
+          minimum: 0
+        reason:
+          type: string
+          enum:
+          - LOST
+          - RETURNED_TO_SENDER
+          - MANUAL
+      description: Wire payload (CloudEvents `data`, camelCase).
+    RefundIssuedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.refund.RefundIssued
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:RefundIssued:v1
+        data:
+          $ref: '#/components/schemas/RefundIssuedData'
+    RefundFailedData:
+      type: object
+      required:
+      - refundId
+      - authorizationId
+      - code
+      - attempts
+      - final
+      properties:
+        refundId:
+          type: string
+        orderId:
+          type: string
+        authorizationId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+        code:
+          type: string
+        attempts:
+          type: integer
+          minimum: 1
+        final:
+          type: boolean
+      description: Wire payload (CloudEvents `data`, camelCase).
+    RefundFailedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/customer-payments
+        type:
+          type: string
+          const: com.retailnetwork.storefront.customer-payments.refund.RefundFailed
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:customer-payments:events:RefundFailed:v1
+        data:
+          $ref: '#/components/schemas/RefundFailedData'
+    CheckoutCompletedData:
+      type: object
+      required:
+      - sessionId
+      - orderId
+      - authorizationId
+      properties:
+        sessionId:
+          type: string
+        orderId:
+          type: string
+        authorizationId:
+          type: string
+      description: The fields this service reads (the producer's payload carries more).
+    ConsumedCheckoutCompletedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/checkout
+        type:
+          type: string
+          const: com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:checkout:events:CheckoutCompleted:v1
+        data:
+          $ref: '#/components/schemas/CheckoutCompletedData'
+    FulfillmentShippedData:
+      type: object
+      required:
+      - orderId
+      - groupNo
+      - trackingNumbers
+      properties:
+        orderId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+        trackingNumbers:
+          type: array
+          items:
+            type: string
+        shippedAt:
+          type: string
+          format: date-time
+      description: The fields this service reads (the producer's payload carries more).
+    ConsumedFulfillmentShippedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/order-sourcing
+        type:
+          type: string
+          const: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentShipped
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:order-sourcing:events:FulfillmentShipped:v1
+        data:
+          $ref: '#/components/schemas/FulfillmentShippedData'
+    FulfillmentCancelledData:
+      type: object
+      required:
+      - orderId
+      - groupNo
+      properties:
+        orderId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+      description: The fields this service reads (the producer's payload carries more).
+    ConsumedFulfillmentCancelledEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/order-sourcing
+        type:
+          type: string
+          const: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentCancelled
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:order-sourcing:events:FulfillmentCancelled:v1
+        data:
+          $ref: '#/components/schemas/FulfillmentCancelledData'
+    FulfillmentUnsourceableData:
+      type: object
+      required:
+      - orderId
+      - groupNo
+      properties:
+        orderId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+      description: The fields this service reads (the producer's payload carries more).
+    ConsumedFulfillmentUnsourceableEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/order-sourcing
+        type:
+          type: string
+          const: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentUnsourceable
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:order-sourcing:events:FulfillmentUnsourceable:v1
+        data:
+          $ref: '#/components/schemas/FulfillmentUnsourceableData'
+    PackageLostData:
+      type: object
+      required:
+      - trackingNumber
+      properties:
+        orderId:
+          type: string
+        trackingNumber:
+          type: string
+      description: The fields this service reads (the producer's payload carries more).
+    ConsumedPackageLostEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/shipping-and-tracking
+        type:
+          type: string
+          const: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageLost
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:shipping-and-tracking:events:PackageLost:v1
+        data:
+          $ref: '#/components/schemas/PackageLostData'
+    PackageReturnedData:
+      type: object
+      required:
+      - trackingNumber
+      properties:
+        orderId:
+          type: string
+        trackingNumber:
+          type: string
+      description: The fields this service reads (the producer's payload carries more).
+    ConsumedPackageReturnedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it.
+        source:
+          type: string
+          const: /retailnetwork/shipping-and-tracking
+        type:
+          type: string
+          const: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReturned
+        subject:
+          type: string
+          description: Also the Kafka message key.
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:shipping-and-tracking:events:PackageReturned:v1
+        data:
+          $ref: '#/components/schemas/PackageReturnedData'

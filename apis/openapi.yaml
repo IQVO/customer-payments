@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: Customer Payments API (proposed)
-  version: 0.1.0-proposed
+  title: Customer Payments API
+  version: 0.1.0
   contact:
     name: customer-payments maintainers
     url: https://github.com/IQVO/customer-payments
