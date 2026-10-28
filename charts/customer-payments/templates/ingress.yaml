@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "customer-ordering.fullname" . }}
+  name: {{ include "customer-payments.fullname" . }}
   labels:
-    {{- include "customer-ordering.labels" . | nindent 4 }}
+    {{- include "customer-payments.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -27,7 +27,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "customer-ordering.fullname" $ }}
+                name: {{ include "customer-payments.fullname" $ }}
                 port:
                   number: {{ $.Values.service.port }}
           {{- end }}

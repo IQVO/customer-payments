@@ -1,10 +1,10 @@
-{{- include "customer-ordering.requireRealRuntime" . -}}
+{{- include "customer-payments.requireRealRuntime" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "customer-ordering.fullname" . }}
+  name: {{ include "customer-payments.fullname" . }}
   labels:
-    {{- include "customer-ordering.labels" . | nindent 4 }}
+    {{- include "customer-payments.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
   {{- if not .Values.autoscaling.api.enabled }}
@@ -12,7 +12,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "customer-ordering.selectorLabels" . | nindent 6 }}
+      {{- include "customer-payments.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: api
   template:
     metadata:
@@ -22,7 +22,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "customer-ordering.selectorLabels" . | nindent 8 }}
+        {{- include "customer-payments.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
@@ -33,14 +33,14 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "customer-ordering.serviceAccountName" . }}
+      serviceAccountName: {{ include "customer-payments.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: {{ include "customer-ordering.image" . | quote }}
+          image: {{ include "customer-payments.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -54,34 +54,36 @@ spec:
           # cmd/api reads is rendered.
           envFrom:
             - configMapRef:
-                name: {{ include "customer-ordering.fullname" . }}
-          # The env contract is cmd/api/main.go's header comment. A value with a
-          # dedicated chart key is rendered here, never through extraEnv.
+                name: {{ include "customer-payments.fullname" . }}
+          # The env contract is cmd/api/main.go's header comment: exactly the
+          # variables the binary reads, no more. A value with a dedicated chart
+          # key is rendered here, never through extraEnv.
           env:
             - name: HTTP_ADDR
               value: {{ .Values.config.httpAddr | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
-            # The one synchronous dependency: quote, make, confirm, cancel.
-            - name: DELIVERY_PROMISE_URL
-              value: {{ .Values.config.deliveryPromiseUrl | quote }}
-            {{- if ne (toString .Values.config.deliveryPromiseTimeout) "" }}
-            - name: DELIVERY_PROMISE_TIMEOUT
-              value: {{ .Values.config.deliveryPromiseTimeout | quote }}
-            {{- end }}
+            # The one synchronous dependency: authorize, capture, void, refund,
+            # reauthorize (the payment provider behind the ACL port).
+            - name: PAYMENT_PROVIDER_URL
+              value: {{ .Values.config.paymentProviderUrl | quote }}
             # The three consumers always run. The group ids come from values,
             # never a literal and never the pod name, and are mandatory (the
             # chart refuses an empty one): a stable id is what makes a
             # rescheduled pod resume from its committed offsets.
-            - name: DELIVERY_PROMISE_CONSUMER_GROUP
-              value: {{ .Values.config.deliveryPromiseConsumerGroup | quote }}
+            - name: CHECKOUT_CONSUMER_GROUP
+              value: {{ .Values.config.checkoutConsumerGroup | quote }}
             - name: ORDER_SOURCING_CONSUMER_GROUP
               value: {{ .Values.config.orderSourcingConsumerGroup | quote }}
-            - name: SHIPPING_CONSUMER_GROUP
-              value: {{ .Values.config.shippingConsumerGroup | quote }}
+            - name: SHIPPING_AND_TRACKING_CONSUMER_GROUP
+              value: {{ .Values.config.shippingAndTrackingConsumerGroup | quote }}
             {{- if ne (toString .Values.config.outboxRelayInterval) "" }}
             - name: OUTBOX_RELAY_INTERVAL
               value: {{ .Values.config.outboxRelayInterval | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.config.policyInterval) "" }}
+            - name: POLICY_INTERVAL
+              value: {{ .Values.config.policyInterval | quote }}
             {{- end }}
             # The relay excludes a row after this many failures (0 = unlimited).
             - name: OUTBOX_MAX_ATTEMPTS
@@ -90,23 +92,11 @@ spec:
             - name: SHUTDOWN_DRAIN_DELAY
               value: {{ .Values.config.shutdownDrainDelay | quote }}
             {{- end }}
-            # Observability env (STANDARD item 7): the same three for every
-            # component, plus ENVIRONMENT for deployment.environment.name.
-            - name: ENVIRONMENT
-              value: {{ .Values.environment | quote }}
-            - name: SERVICE_VERSION
-              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
-            {{- if .Values.otel.enabled }}
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ .Values.otel.endpoint | quote }}
-            - name: OTEL_SERVICE_NAME
-              value: {{ .Values.otel.serviceName | quote }}
-            {{- end }}
             # DATABASE_URL always comes from a Secret.
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "customer-ordering.databaseSecretName" . }}
+                  name: {{ include "customer-payments.databaseSecretName" . }}
                   key: {{ .Values.database.existingSecretKey }}
             {{- if .Values.database.migrationsExistingSecretKey }}
             # A direct (non-pooled) DSN used only for the boot migrations.
@@ -115,7 +105,7 @@ spec:
             - name: MIGRATIONS_DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "customer-ordering.databaseSecretName" . }}
+                  name: {{ include "customer-payments.databaseSecretName" . }}
                   key: {{ .Values.database.migrationsExistingSecretKey }}
                   optional: true
             {{- end }}

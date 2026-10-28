@@ -1,10 +1,10 @@
 apiVersion: v2
-name: customer-ordering
-description: Customer Ordering - turns a cart into a customer order (promise per shipment group, ship-to, status and tracking, cancellation); publishes CustomerOrderPlaced and CustomerOrderCancelled on retailnetwork.customer-ordering.events
+name: customer-payments
+description: Customer Payments - moves money with the shipment facts (authorize at checkout, capture per shipped allocation, release on cancellation, refund on lost/returned packages, re-authorize before expiry); publishes on retailnetwork.customer-payments.events
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-home: https://github.com/IQVO/customer-ordering
+home: https://github.com/IQVO/customer-payments
 keywords:
   - ddd
   - hexagonal-architecture

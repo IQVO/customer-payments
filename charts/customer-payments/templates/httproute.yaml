@@ -2,9 +2,9 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "customer-ordering.fullname" . }}
+  name: {{ include "customer-payments.fullname" . }}
   labels:
-    {{- include "customer-ordering.labels" . | nindent 4 }}
+    {{- include "customer-payments.labels" . | nindent 4 }}
 spec:
   parentRefs:
     {{- range .Values.gatewayApi.parentRefs }}
@@ -29,7 +29,7 @@ spec:
               replacePrefixMatch: /
       {{- end }}
       backendRefs:
-        - name: {{ include "customer-ordering.fullname" $ }}
+        - name: {{ include "customer-payments.fullname" $ }}
           port: {{ $.Values.service.port }}
     {{- end }}
 {{- end }}

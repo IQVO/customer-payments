@@ -1,49 +1,49 @@
 {{- if .Values.mcp.enabled }}
-{{- include "customer-ordering.requireDatabase" . -}}
+{{- include "customer-payments.requireDatabase" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "customer-ordering.mcpFullname" . }}
+  name: {{ include "customer-payments.mcpFullname" . }}
   labels:
-    {{- include "customer-ordering.labels" . | nindent 4 }}
+    {{- include "customer-payments.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp
 spec:
   replicas: {{ .Values.mcp.replicaCount }}
   selector:
     matchLabels:
-      {{- include "customer-ordering.selectorLabels" . | nindent 6 }}
+      {{- include "customer-payments.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: mcp
   template:
     metadata:
       labels:
-        {{- include "customer-ordering.selectorLabels" . | nindent 8 }}
+        {{- include "customer-payments.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: mcp
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "customer-ordering.serviceAccountName" . }}
+      serviceAccountName: {{ include "customer-payments.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: mcp
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: {{ include "customer-ordering.image" . | quote }}
+          image: {{ include "customer-payments.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/app/mcp"]
           ports:
             - name: http
               containerPort: {{ .Values.mcp.service.targetPort }}
               protocol: TCP
-          # Env contract verified against cmd/mcp (main.go, telemetry.go): MCP_ADDR,
-          # LOG_LEVEL, SERVICE_VERSION, ENVIRONMENT, OTEL_SERVICE_NAME,
-          # OTEL_EXPORTER_OTLP_ENDPOINT, DATABASE_URL and (the boot migrations
+          # Env contract verified against cmd/mcp/main.go (the header comment
+          # and the getenv/os.Getenv calls): MCP_ADDR, LOG_LEVEL,
+          # SERVICE_VERSION, ENVIRONMENT, DATABASE_URL and (the boot migrations
           # only) MIGRATIONS_DATABASE_URL. cmd/mcp has no auth env, starts no
-          # outbox relay, runs none of the three consumers, never dials Kafka
-          # (no KAFKA_BROKERS, no consumer groups here) and never calls
-          # delivery-promise: it is read-only (ADR 0005).
+          # outbox relay, runs none of the three consumers and no policy loop,
+          # never dials Kafka (no KAFKA_BROKERS, no consumer groups here) and
+          # never calls the payment provider: it is read-only.
           env:
             - name: MCP_ADDR
               value: {{ .Values.mcp.httpAddr | quote }}
@@ -53,16 +53,10 @@ spec:
               value: {{ .Values.mcp.serviceVersion | default .Values.image.tag | default .Chart.AppVersion | quote }}
             - name: ENVIRONMENT
               value: {{ .Values.mcp.environment | quote }}
-            {{- if .Values.otel.enabled }}
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: {{ .Values.otel.endpoint | quote }}
-            - name: OTEL_SERVICE_NAME
-              value: {{ printf "%s-mcp" .Values.otel.serviceName | quote }}
-            {{- end }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "customer-ordering.databaseSecretName" . }}
+                  name: {{ include "customer-payments.databaseSecretName" . }}
                   key: {{ .Values.database.existingSecretKey }}
             {{- if .Values.database.migrationsExistingSecretKey }}
             # cmd/mcp runs the idempotent embedded migrations on start (like
@@ -70,7 +64,7 @@ spec:
             - name: MIGRATIONS_DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "customer-ordering.databaseSecretName" . }}
+                  name: {{ include "customer-payments.databaseSecretName" . }}
                   key: {{ .Values.database.migrationsExistingSecretKey }}
                   optional: true
             {{- end }}
