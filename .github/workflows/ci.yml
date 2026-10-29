@@ -159,8 +159,8 @@ jobs:
           go-version-file: go.mod
       - name: Install gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
-      - name: Mutation testing (fast subset — authorization aggregate)
-        run: gremlins unleash ./internal/domain/authorization
+      - name: Mutation testing (every domain package)
+        run: for pkg in ./internal/domain/*/; do gremlins unleash "${pkg%/}" || exit 1; done
 
   mutation:
     runs-on: ubuntu-latest
@@ -177,7 +177,7 @@ jobs:
       - name: Install gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
       - name: Mutation testing (domain layer)
-        run: gremlins unleash ./internal/domain --workers 1 --timeout-coefficient 30
+        run: for pkg in ./internal/domain/*/; do gremlins unleash "${pkg%/}" --workers 1 --timeout-coefficient 30 || exit 1; done
       - name: Open or refresh the harness:red issue on a scheduled failure
         if: failure() && github.event_name == 'schedule'
         env:
@@ -224,6 +224,38 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: govulncheck
         run: govulncheck ./...
+
+  # ============================================================
+  # CLASSIFICATION: PACKAGING (Helm chart lint)
+  # Packaging validation on pull requests: chart-testing lints
+  # charts/customer-payments with ci/default-values.yaml and
+  # ci/all-components-values.yaml, then the wiring test (the Service selects
+  # exactly one Deployment). The plain `if:` is deliberate: never gate a job
+  # on hashFiles at job level. Not a required check; chart-tests below runs
+  # on every push.
+  # ============================================================
+  helm-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.16.4
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.x"
+          check-latest: true
+      - uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
+      - name: Run chart-testing (lint)
+        run: ct lint --charts charts/customer-payments --validate-maintainers=false --check-version-increment=false
+      - name: Chart wiring tests (the Service selects exactly one Deployment)
+        run: |
+          pip install --require-hashes -r .github/requirements/chart-tests.txt
+          python3 charts/customer-payments/tests/test_service_selectors.py
 
   # ============================================================
   # CLASSIFICATION: PACKAGING (Helm chart tests)

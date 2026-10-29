@@ -1,0 +1,353 @@
+[
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read one payment authorization by id: its state (AUTHORIZED, PARTIALLY_CAPTURED, CAPTURED, RELEASED, VOIDED, EXPIRED or DECLINED), the checkout session and order it belongs to, the currency and total in minor units, every allocation per shipment group (groupNo, amountMinor, PENDING, CAPTURED or RELEASED, tracking numbers) and when the hold expires. Read-only; an unknown id fails with not-found.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "authorizationId": {
+          "description": "the authorization id, e.g. pay-3f9c1a2b4d5e",
+          "type": "string"
+        }
+      },
+      "required": [
+        "authorizationId"
+      ],
+      "type": "object"
+    },
+    "name": "get_payment_authorization",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "allocations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amountMinor": {
+                "type": "integer"
+              },
+              "groupNo": {
+                "type": "integer"
+              },
+              "state": {
+                "type": "string"
+              },
+              "trackingNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "groupNo",
+              "amountMinor",
+              "state",
+              "trackingNumbers"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "authorizationId": {
+          "type": "string"
+        },
+        "checkoutSessionId": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "declineReason": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "orderId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "totalMinor": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "authorizationId",
+        "checkoutSessionId",
+        "state",
+        "currency",
+        "totalMinor",
+        "allocations"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read one refund by id: its state (REQUESTED, SUCCEEDED or FAILED), reason (LOST, RETURNED_TO_SENDER or MANUAL), order, group, amount in minor units, how many provider attempts were made and the last failure code. Read-only; an unknown id fails with not-found.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "refundId": {
+          "description": "the refund id, e.g. ref-3f9c1a2b4d5e",
+          "type": "string"
+        }
+      },
+      "required": [
+        "refundId"
+      ],
+      "type": "object"
+    },
+    "name": "get_refund",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "amountMinor": {
+          "type": "integer"
+        },
+        "attempts": {
+          "type": "integer"
+        },
+        "authorizationId": {
+          "type": "string"
+        },
+        "failureCode": {
+          "type": "string"
+        },
+        "groupNo": {
+          "type": "integer"
+        },
+        "orderId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "refundId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "refundId",
+        "authorizationId",
+        "orderId",
+        "amountMinor",
+        "reason",
+        "state",
+        "attempts"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "List the payment authorizations of one order (orderId) or of one checkout session (checkoutSessionId, declined attempts included). Give exactly one of the two. Read-only.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "checkoutSessionId": {
+          "description": "optional: the checkout session id; give exactly one of orderId and checkoutSessionId",
+          "type": "string"
+        },
+        "orderId": {
+          "description": "optional: the order id; give exactly one of orderId and checkoutSessionId",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "list_payment_authorizations",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "authorizations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "allocations": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amountMinor": {
+                      "type": "integer"
+                    },
+                    "groupNo": {
+                      "type": "integer"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "trackingNumbers": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": [
+                        "null",
+                        "array"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "groupNo",
+                    "amountMinor",
+                    "state",
+                    "trackingNumbers"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "authorizationId": {
+                "type": "string"
+              },
+              "checkoutSessionId": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "declineReason": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string"
+              },
+              "orderId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "totalMinor": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "authorizationId",
+              "checkoutSessionId",
+              "state",
+              "currency",
+              "totalMinor",
+              "allocations"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "authorizations"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "List the refunds of one order, oldest first. Read-only.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "orderId": {
+          "description": "the order whose refunds to list",
+          "type": "string"
+        }
+      },
+      "required": [
+        "orderId"
+      ],
+      "type": "object"
+    },
+    "name": "list_refunds",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "refunds": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amountMinor": {
+                "type": "integer"
+              },
+              "attempts": {
+                "type": "integer"
+              },
+              "authorizationId": {
+                "type": "string"
+              },
+              "failureCode": {
+                "type": "string"
+              },
+              "groupNo": {
+                "type": "integer"
+              },
+              "orderId": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "refundId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "refundId",
+              "authorizationId",
+              "orderId",
+              "amountMinor",
+              "reason",
+              "state",
+              "attempts"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "refunds"
+      ],
+      "type": "object"
+    }
+  }
+]

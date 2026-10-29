@@ -1,0 +1,32 @@
+# Non-secret configuration of the api component, mirrored from the env the
+# Deployment renders and mounted into the api container with envFrom (the
+# explicit env entries win for the same key); the Deployment's checksum/config
+# annotation rolls the pods whenever any of it changes. Every key is a variable
+# cmd/api reads (tests/render_test.sh). A DSN never lands here: DATABASE_URL and
+# MIGRATIONS_DATABASE_URL live in the Secret (templates/secret.yaml or
+# database.existingSecret).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "customer-payments.fullname" . }}
+  labels:
+    {{- include "customer-payments.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+data:
+  HTTP_ADDR: {{ .Values.config.httpAddr | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  KAFKA_BROKERS: {{ .Values.kafka.brokers | quote }}
+  PAYMENT_PROVIDER_URL: {{ .Values.config.paymentProviderUrl | quote }}
+  CHECKOUT_CONSUMER_GROUP: {{ .Values.config.checkoutConsumerGroup | quote }}
+  ORDER_SOURCING_CONSUMER_GROUP: {{ .Values.config.orderSourcingConsumerGroup | quote }}
+  SHIPPING_AND_TRACKING_CONSUMER_GROUP: {{ .Values.config.shippingAndTrackingConsumerGroup | quote }}
+  {{- if ne (toString .Values.config.outboxRelayInterval) "" }}
+  OUTBOX_RELAY_INTERVAL: {{ .Values.config.outboxRelayInterval | quote }}
+  {{- end }}
+  {{- if ne (toString .Values.config.policyInterval) "" }}
+  POLICY_INTERVAL: {{ .Values.config.policyInterval | quote }}
+  {{- end }}
+  OUTBOX_MAX_ATTEMPTS: {{ .Values.config.outboxMaxAttempts | quote }}
+  {{- if ne (toString .Values.config.shutdownDrainDelay) "" }}
+  SHUTDOWN_DRAIN_DELAY: {{ .Values.config.shutdownDrainDelay | quote }}
+  {{- end }}

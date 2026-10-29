@@ -27,7 +27,7 @@ check a design decision against this fleet's standing architecture.
 2. **Customer/Supplier direction, per `.claude/rules/domain-model.md`
    (or this repo's equivalent doc).** A new outbound call to a sibling
    context must go the direction ADRs already established — check
-   `docs/docs/adr/` for the relevant context-mapping ADR before assuming
+   `docs/adr/` for the relevant context-mapping ADR before assuming
    a new integration is fine. Flag any outbound call added to a context
    this repo doesn't already integrate with; that's a new architectural
    decision that needs its own ADR, not a code change slipped in
@@ -42,7 +42,7 @@ check a design decision against this fleet's standing architecture.
    no mutating HTTP method or MCP tool without `ReadOnlyHint: true` was
    added to an outbound/inbound surface bound by that constraint.
 4. **Analytics isolation (ADR-0006-style, where this repo has an
-   `internal/analytics/` read side).** The OLTP domain/application layers
+   `internal/application/views/` read side).** The OLTP domain/application layers
    must never import the analytics store or read model; the analytics
    side must depend on nothing internal except itself. This is a real,
    already-fitness-tested rule in most repos — confirm the test exists
