@@ -1,5 +1,7 @@
 # customer-payments
 
+[![CI](https://github.com/IQVO/customer-payments/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/IQVO/customer-payments/actions/workflows/ci.yml?query=branch%3Adevelop) [![coverage gate](https://img.shields.io/badge/coverage%20gate-90%25-brightgreen)](https://github.com/IQVO/customer-payments/blob/develop/Makefile) [![Go](https://img.shields.io/badge/go-1.27.3-00ADD8?logo=go&logoColor=white)](https://github.com/IQVO/customer-payments/blob/develop/go.mod) [![release](https://img.shields.io/github/v/release/IQVO/customer-payments?sort=semver)](https://github.com/IQVO/customer-payments/releases) [![docs](https://img.shields.io/badge/docs-iqvo.github.io-blue)](https://iqvo.github.io/customer-payments/) [![license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/IQVO/customer-payments/blob/develop/LICENSE)
+
 Storefront (e-commerce) domain of the retail-network organisation, bounded context **Customer Payments** (Generic, storefront tier).
 
 Moves money with the shipment facts: authorize at checkout, capture each shipment group's allocation when it ships, release on cancellation, refund on lost or returned packages, re-authorize uncaptured allocations before the provider's authorization validity expires [9]. Speaks to the payment provider through an Anti-Corruption Layer port (Authorize, Capture, Void, Refund, Reauthorize); the payment-provider-simulator is the stand-in adapter and swapping it for a real provider changes nothing else. Never sees a card number, only PSP tokens [11][12].
