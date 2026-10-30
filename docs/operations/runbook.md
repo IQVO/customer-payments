@@ -56,6 +56,20 @@ External exposure, when `mcp.route.enabled=true`, is the Gateway HTTPRoute
 it is a probe concern, not a public endpoint
 (`charts/customer-payments/templates/mcp-route.yaml`).
 
+## The optional A2A agent
+
+`cmd/a2a` is a third, read-only deployable ([ADR 0005](../adr/0005-a2a-inbound-adapter.md)) over the same read use cases:
+Agent2Agent JSON-RPC on `/` and `/a2a` at `A2A_ADDR` (default `:8093`), the Agent Card at
+`/.well-known/agent-card.json` and `GET /healthz` for the probes. It runs the same embedded migrations at boot, never dials
+Kafka, runs no consumer, no relay and no policy loop, never calls the payment provider, and has NO auth. `A2A_AGENT_URL`
+(absolute http(s) URL advertised on the card) is mandatory: the process refuses to boot without it. The chart renders it only
+with `a2a.enabled=true` (`charts/customer-payments/templates/a2a-deployment.yaml`); `A2A_AGENT_URL` defaults to
+`http://<release>-a2a.<ns>.svc.cluster.local:8093/` and is overridden by `a2a.agentUrl`.
+
+External exposure, when `a2a.route.enabled=true`, is the Gateway HTTPRoute **`/api/a2a/customer-payments`** → Service :8093,
+prefix rewritten to `/` (the card stays reachable under the same prefix); `/healthz` stays off the host
+(`charts/customer-payments/templates/a2a-route.yaml`).
+
 ## Dependencies
 
 | Dependency | Used for | Source |
@@ -101,7 +115,7 @@ Notes:
 
 Env vars `cmd/api` reads (contract: `cmd/api/main.go` header comment, validated
 in `cmd/api/config.go`; rendered in
-`charts/customer-payments/templates/deployment.yaml`; the mcp component reads
+`charts/customer-payments/templates/deployment.yaml`; the mcp and a2a components read
 the subset marked •):
 
 | Env var | Chart value | Default | Notes |
@@ -120,9 +134,11 @@ the subset marked •):
 | `OUTBOX_MAX_ATTEMPTS` | `config.outboxMaxAttempts` | `20` | failures before the relay excludes a row; `0` = unlimited |
 | `SHUTDOWN_DRAIN_DELAY` | `config.shutdownDrainDelay` | `5s` | wait after `/readyz` flips before the listener closes; `0` disables |
 | `MCP_ADDR` | `mcp.httpAddr` | `:8090` | mcp only: listen address of the Streamable HTTP server |
+| `A2A_ADDR` | `a2a.httpAddr` | `:8093` | a2a only: listen address of the A2A JSON-RPC server |
+| `A2A_AGENT_URL` | `a2a.agentUrl` | `http://<release>-a2a.<ns>.svc.cluster.local:8093/` | a2a only: absolute http(s) URL advertised on the Agent Card; mandatory in the binary |
 | `SERVICE_VERSION` • | image tag (`appVersion` when empty; `mcp.serviceVersion` overrides for mcp) | image tag | resource attribute and the boot log's build label |
 | `ENVIRONMENT` • | `environment` (`mcp.environment` for mcp) | `production` | `deployment.environment.name` on every span, metric and log |
-| `OTEL_SERVICE_NAME` • | `otel.serviceName` (mcp gets `<serviceName>-mcp`) | `customer-payments` | `service.name` of spans and metrics |
+| `OTEL_SERVICE_NAME` • | `otel.serviceName` (mcp gets `<serviceName>-mcp`, a2a `<serviceName>-a2a`) | `customer-payments` | `service.name` of spans and metrics |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` • | `otel.endpoint` | Collector OTLP/gRPC | not rendered when `otel.enabled=false` (the binaries then fall back to `localhost:4317`) |
 
 A missing required variable is a boot error that names the variable
@@ -222,11 +238,13 @@ Behavior — Idempotency-Key middleware (`internal/adapters/inbound/http/idempot
 - Restart: `kubectl -n warehouse-systems rollout restart deploy/customer-payments`
 - Logs: Grafana Loki (JSON slog on stdout with `trace_id`/`span_id`); raise
   `config.logLevel` to `debug` for a noisy pod. Traces: Jaeger, service
-  `customer-payments` (mcp: `customer-payments-mcp`).
+  `customer-payments` (mcp: `customer-payments-mcp`, a2a: `customer-payments-a2a`).
 - In-cluster REST: Service port 80 → container 8080; the external path is the
   gateway route `/api/customer-payments`.
 - MCP (when enabled): Streamable HTTP at `/api/mcp/customer-payments` through
   the gateway (rewritten to `/mcp`), or in-cluster on Service port 8090.
+- A2A (when enabled): JSON-RPC at `/api/a2a/customer-payments` through the gateway (rewritten to `/`; the Agent Card at
+  `/api/a2a/customer-payments/.well-known/agent-card.json`), or in-cluster on Service port 8093.
 - Scale: HPA off by default (`autoscaling.api`); N>1 is safe for the relay (row
   claims), the version-guarded writes and the consumers (stable groups, inbox
   dedupe), but has not been load-tested (`charts/customer-payments/values.yaml`).

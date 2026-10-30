@@ -241,6 +241,48 @@ mcp:
       cpu: 100m
       memory: 128Mi
 
+# The optional A2A agent: cmd/a2a, a read-only third deployable (ADR 0005) over
+# the SAME read use cases the REST and MCP adapters serve, speaking Agent2Agent
+# JSON-RPC on / and /a2a with the Agent Card at /.well-known/agent-card.json
+# (:8093; 8090 is the MCP server). Never dials Kafka, runs no consumer, no relay
+# and no policy loop, calls no sibling context and no payment provider, and has
+# NO auth (fleet-wide revert 2026-09-11): access control is the in-cluster
+# ClusterIP boundary. Needs database.* like the api (the same Secret), nothing
+# else.
+a2a:
+  enabled: false
+  replicaCount: 1
+  httpAddr: ":8093"                  # A2A_ADDR; keep in sync with service.targetPort
+  # Absolute URL advertised on the Agent Card (A2A_AGENT_URL, mandatory in the
+  # binary). Empty defaults to this release's in-cluster Service DNS
+  # (http://<release>-a2a.<ns>.svc.cluster.local:8093/); warehouse-infra can
+  # override it with the gateway URL when the agent must be reachable
+  # off-cluster.
+  agentUrl: ""
+  service:
+    type: ClusterIP
+    port: 8093
+    targetPort: 8093
+  # Gateway exposure: /api/a2a/customer-payments -> Service :8093, prefix
+  # rewritten to / (JSON-RPC root; the well-known agent card stays reachable
+  # under the same prefix). Off by default; needs the Gateway parentRef from
+  # warehouse-infra; NO auth of any kind on the route.
+  route:
+    enabled: false
+    path: "/api/a2a/customer-payments"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 nodeSelector: {}
 tolerations: []
 affinity: {}

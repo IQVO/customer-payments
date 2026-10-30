@@ -1,0 +1,22 @@
+{{- if .Values.a2a.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "customer-payments.a2aFullname" . }}
+  labels:
+    {{- include "customer-payments.labels" . | nindent 4 }}
+    app.kubernetes.io/component: a2a
+spec:
+  type: {{ .Values.a2a.service.type }}
+  ports:
+    - port: {{ .Values.a2a.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  # component=a2a pins the Service to the a2a Deployment's pods only
+  # (tests/test_service_selectors.py): the read-only A2A agent, never the
+  # api.
+  selector:
+    {{- include "customer-payments.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: a2a
+{{- end }}
