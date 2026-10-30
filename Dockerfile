@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # --- build stage ---
-FROM golang:1.27-alpine@sha256:738d1cf061836894ff6bb8c33881080ac66de8cf0586615012a0c8f592649cfa AS build
+FROM golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS build
 WORKDIR /src
 
 # Cache go.mod/go.sum download separately from source so editing source
@@ -40,7 +40,7 @@ WORKDIR /app
 # filesystem read-only. Logs go to stdout.
 COPY --from=build --chown=app:app /out/ ./
 USER 1000
-EXPOSE 8080
+EXPOSE 8080 8093
 # cmd/api is the service's main binary (HTTP on :8080). Additional cmd/*
 # binaries are run by the chart with `command: ["/app/<dirname>"]`.
 ENTRYPOINT ["./api"]

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "customer-payments.fullname" . }}
+  labels:
+    {{- include "customer-payments.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  # component=api pins the Service to the api Deployment's pods
+  # (tests/test_service_selectors.py).
+  selector:
+    {{- include "customer-payments.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api

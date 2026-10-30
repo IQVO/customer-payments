@@ -49,6 +49,14 @@ type AuthorizeResult struct {
 // provider that cannot be reached is provider.ErrUnavailable and nothing
 // is stored.
 func (u AuthorizePayment) Execute(ctx context.Context, in AuthorizePaymentInput) (AuthorizeResult, error) {
+	res, err := u.execute(ctx, in)
+	if err != nil || res.Created {
+		u.recordOutcome(ctx, res, err)
+	}
+	return res, err
+}
+
+func (u AuthorizePayment) execute(ctx context.Context, in AuthorizePaymentInput) (AuthorizeResult, error) {
 	return transact(ctx, u.UoW, commandAttempts, func(ctx context.Context) (AuthorizeResult, error) {
 		if shared.ValidID(in.CheckoutSessionID) {
 			existing, err := u.Authorizations.FindLiveBySession(ctx, in.CheckoutSessionID)
