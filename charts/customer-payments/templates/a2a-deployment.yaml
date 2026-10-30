@@ -1,0 +1,117 @@
+{{- if .Values.a2a.enabled }}
+{{- include "customer-payments.requireDatabase" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "customer-payments.a2aFullname" . }}
+  labels:
+    {{- include "customer-payments.labels" . | nindent 4 }}
+    app.kubernetes.io/component: a2a
+spec:
+  replicas: {{ .Values.a2a.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "customer-payments.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: a2a
+  template:
+    metadata:
+      labels:
+        {{- include "customer-payments.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: a2a
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "customer-payments.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: a2a
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "customer-payments.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/a2a"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.a2a.service.targetPort }}
+              protocol: TCP
+          # Env contract verified against cmd/a2a (main.go, telemetry.go):
+          # A2A_ADDR, A2A_AGENT_URL, LOG_LEVEL, SERVICE_VERSION, ENVIRONMENT,
+          # OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT, DATABASE_URL and
+          # (the boot migrations only) MIGRATIONS_DATABASE_URL. cmd/a2a has no auth env, starts no
+          # outbox relay, runs none of the three consumers and no policy loop,
+          # never dials Kafka (no KAFKA_BROKERS, no consumer groups here) and
+          # never calls the payment provider: it is read-only (ADR 0005).
+          env:
+            - name: A2A_ADDR
+              value: {{ .Values.a2a.httpAddr | quote }}
+            # The Agent Card must advertise a URL agent clients can dial
+            # (ADR 0005): default to this release's in-cluster Service DNS.
+            - name: A2A_AGENT_URL
+              value: {{ .Values.a2a.agentUrl | default (printf "http://%s.%s.svc.cluster.local:%d/" (include "customer-payments.a2aFullname" .) .Release.Namespace (int .Values.a2a.service.port)) | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: SERVICE_VERSION
+              value: {{ .Values.a2a.serviceVersion | default .Values.image.tag | default .Chart.AppVersion | quote }}
+            - name: ENVIRONMENT
+              value: {{ .Values.a2a.environment | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ printf "%s-a2a" .Values.otel.serviceName | quote }}
+            {{- end }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-payments.databaseSecretName" . }}
+                  key: {{ .Values.database.existingSecretKey }}
+            {{- if .Values.database.migrationsExistingSecretKey }}
+            # cmd/a2a runs the idempotent embedded migrations on start (like
+            # cmd/api), so it needs the same direct-connection split.
+            - name: MIGRATIONS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "customer-payments.databaseSecretName" . }}
+                  key: {{ .Values.database.migrationsExistingSecretKey }}
+                  optional: true
+            {{- end }}
+            {{- range .Values.a2a.extraEnv }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
+          # GET /healthz is served by cmd/a2a, so the probes have a cheap target.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.a2a.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

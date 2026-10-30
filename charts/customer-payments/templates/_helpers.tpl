@@ -82,6 +82,14 @@ read-only second deployable over the same read use cases (default off).
 {{- end }}
 
 {{/*
+Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 0005):
+a read-only third deployable over the same read use cases (default off).
+*/}}
+{{- define "customer-payments.a2aFullname" -}}
+{{- include "customer-payments.fullname" . }}-a2a
+{{- end }}
+
+{{/*
 Image reference. The release job publishes the image as v<version> (and packages
 the chart with appVersion <version>), so an empty image.tag means "v" + appVersion.
 */}}
