@@ -58,7 +58,7 @@ it is a probe concern, not a public endpoint
 
 ## The optional A2A agent
 
-`cmd/a2a` is a third, read-only deployable ([ADR 0005](../adr/0005-a2a-inbound-adapter.md)) over the same read use cases:
+`cmd/a2a` is a third, read-only deployable ([ADR 0005](/docs/adr/0005-a2a-inbound-adapter)) over the same read use cases:
 Agent2Agent JSON-RPC on `/` and `/a2a` at `A2A_ADDR` (default `:8093`), the Agent Card at
 `/.well-known/agent-card.json` and `GET /healthz` for the probes. It runs the same embedded migrations at boot, never dials
 Kafka, runs no consumer, no relay and no policy loop, never calls the payment provider, and has NO auth. `A2A_AGENT_URL`

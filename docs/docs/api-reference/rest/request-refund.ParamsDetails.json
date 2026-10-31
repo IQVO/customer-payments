@@ -1,0 +1,1 @@
+{"parameters":[{"name":"Idempotency-Key","in":"header","required":true,"description":"A repeated key returns the stored response of the first call.","schema":{"type":"string","minLength":1,"maxLength":128}}]}
