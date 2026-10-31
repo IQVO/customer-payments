@@ -35,7 +35,13 @@ function HomepageHeader() {
           {siteConfig.title}
         </Heading>
         <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
-        <p className={styles.heroLead}>TODO-LEAD</p>
+        <p className={styles.heroLead}>
+          Authorizes the quote total at checkout, captures each shipment group's
+          share when it ships, releases it on cancellation, and refunds lost or
+          returned packages, all against a payment provider behind an
+          Anti-Corruption Layer. Three binaries: the REST API with outbox and
+          consumers, a read-only MCP server and an A2A agent.
+        </p>
         <div className={styles.buttons}>
           <Link className="button button--primary button--lg" to="/docs/overview/introduction">
             Read the docs
