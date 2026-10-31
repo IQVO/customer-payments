@@ -1,0 +1,1 @@
+{"title":"Body","body":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["orderId","amountMinor","reason"],"properties":{"orderId":{"type":"string"},"amountMinor":{"type":"integer","format":"int64","minimum":1},"reason":{"type":"string","enum":["LOST","RETURNED_TO_SENDER","MANUAL"]}},"title":"RefundRequest"}}}}}
