@@ -48,7 +48,7 @@ All errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>
 | 422 `unknown-group` | a refund or fact names a `groupNo` the authorization does not have | check `GET /payment-authorizations/{authorizationId}` |
 | 422 `payment-declined` | the provider declined an operation that has no stored-decline form | read `detail` for the code |
 | 404 `not-found` | unknown authorization or refund id, or `POST /refunds` for an order with no bound authorization (`authorization of order ...: not found`) | the order is bound by the `CheckoutCompleted` event; see "Facts stay parked" below |
-| 409 `duplicate-authorization` | the checkout session already holds a live authorization | read it back with `GET /payment-authorizations?checkoutSessionId=` |
+| 409 `duplicate-authorization` | two concurrent authorize requests for one checkout session raced past the live-session lookup (the database allows one non-`DECLINED` authorization per session); a sequential repeat returns the existing authorization with `200` instead | read it back with `GET /payment-authorizations?checkoutSessionId=` |
 | 409 `order-already-bound` | the authorization is bound to a different order | check the checkout event that bound it |
 | 409 `capture-after-expiry` | a capture fact arrived after the hold expired | the fact is dead-lettered; investigate the shipping delay and refund / re-authorize out of band |
 | 409 `over-refund` | refunds (REQUESTED plus SUCCEEDED) would exceed the captured total of the order or group | list `GET /refunds?orderId=` and compare with the captured amounts |
