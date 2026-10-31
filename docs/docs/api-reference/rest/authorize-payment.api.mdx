@@ -1,0 +1,70 @@
+---
+id: authorize-payment
+title: "Authorize the quote total of a checkout session"
+description: "AuthorizePayment. One authorization per checkout session (ErrDuplicateAuthorization; a replay with the same Idempotency-Key returns the existing one). checkout calls this with key <sessionId>:auth and one allocation per shipment group; allocations must sum to the authorized total and name the session's groups (ErrAllocationMismatch). On a provider decline the record is DECLINED (terminal) and the checkout session stays open for another token."
+sidebar_label: "Authorize the quote total of a checkout session"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/customer-payments-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Authorize the quote total of a checkout session"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/payment-authorizations"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+AuthorizePayment. One authorization per checkout session (ErrDuplicateAuthorization; a replay with the same Idempotency-Key returns the existing one). checkout calls this with key &lt;sessionId&gt;:auth and one allocation per shipment group; allocations must sum to the authorized total and name the session's groups (ErrAllocationMismatch). On a provider decline the record is DECLINED (terminal) and the checkout session stays open for another token.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./authorize-payment.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./authorize-payment.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./authorize-payment.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

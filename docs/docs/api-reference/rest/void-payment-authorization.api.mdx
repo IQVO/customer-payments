@@ -1,0 +1,70 @@
+---
+id: void-payment-authorization
+title: "Void an uncaptured authorization"
+description: "VoidAuthorization. checkout calls this with key <sessionId>:void, and only after a definitive rejection of the place-order step (never while the outcome is in doubt; that side is guarded by checkout's ErrPlacementInDoubt). VoidUnboundAuthorizations also voids an authorization that no CheckoutCompleted bound within 24 h."
+sidebar_label: "Void an uncaptured authorization"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/customer-payments-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Void an uncaptured authorization"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/payment-authorizations/{authorizationId}:void"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+VoidAuthorization. checkout calls this with key &lt;sessionId&gt;:void, and only after a definitive rejection of the place-order step (never while the outcome is in doubt; that side is guarded by checkout's ErrPlacementInDoubt). VoidUnboundAuthorizations also voids an authorization that no CheckoutCompleted bound within 24 h.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./void-payment-authorization.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./void-payment-authorization.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./void-payment-authorization.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
