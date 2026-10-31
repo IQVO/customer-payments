@@ -1,12 +1,123 @@
+---
+id: runbook
+title: Runbook
+sidebar_label: Runbook
+sidebar_position: 2
+---
+
 # Customer Payments runbook
 
-Customer Payments is the retail network's bounded context that moves money with
+Customer Payments is the storefront bounded context that moves money with
 the shipment facts: it authorizes at checkout, captures per shipped allocation,
 releases on cancellation, refunds lost/returned packages and re-authorizes
-before the provider's validity expires (`README.md`, `docs/adr/0001`,
-`docs/adr/0002`). It publishes its decisions on
+before the provider's validity expires ([README](https://github.com/IQVO/customer-payments/blob/develop/README.md), [ADR 0001](/docs/adr/0001-customer-payments-bounded-context),
+[ADR 0002](/docs/adr/0002-customer-payments-assumptions)). It publishes its decisions on
 `retailnetwork.customer-payments.events`. This runbook covers the deployed
-processes and what to do when they misbehave.
+processes and what to do when they misbehave. Every variable is documented in
+[Configuration](/docs/operations/configuration); symptoms and fixes by cause
+are in [Troubleshooting](/docs/operations/troubleshooting).
+
+## Deployment
+
+The Helm chart `charts/customer-payments` (Chart.yaml in the repository) renders
+three components, each its own Deployment and ClusterIP Service:
+
+| Component | Binary | Service port | Rendered when | Probes |
+| --- | --- | --- | --- | --- |
+| `api` | `cmd/api` | 80 → container 8080 | always | startup and liveness `/healthz`, readiness `/readyz` |
+| `mcp` | `cmd/mcp` | 8090 | `mcp.enabled=true` | `/healthz` |
+| `a2a` | `cmd/a2a` | 8093 | `a2a.enabled=true` | `/healthz` |
+
+The chart refuses to render without the mandatory values (the failure names
+them): `database.url` or `database.existingSecret`, `kafka.brokers`,
+`config.paymentProviderUrl` and the three `config.*ConsumerGroup` ids. It also
+refuses any `*_MODE` or `*_CONSUMER_GROUP` in `extraEnv`, any variable the chart
+renders itself, and a `terminationGracePeriodSeconds` that does not exceed the
+worst-case shutdown (see below). The image is built from the repository
+Dockerfile (uid 1000, read-only root filesystem), published as
+`warehouse/customer-payments`, tag `v<version>`.
+
+```sh
+helm upgrade --install customer-payments ./charts/customer-payments \
+  --set database.existingSecret=customer-payments-db \
+  --set kafka.brokers="<broker>:9092" \
+  --set config.paymentProviderUrl="http://payment-provider-simulator:80" \
+  --set config.checkoutConsumerGroup=customer-payments-checkout \
+  --set config.orderSourcingConsumerGroup=customer-payments-order-sourcing \
+  --set config.shippingAndTrackingConsumerGroup=customer-payments-shipping-and-tracking
+```
+
+In the fleet's kind cluster the release is driven by `warehouse-infra`
+(`helm-values/customer-payments.yaml`): namespace `warehouse-systems`, Secret
+`customer-payments-db` (keys `DATABASE_URL`, `MIGRATIONS_DATABASE_URL`), the
+provider at `http://payment-provider-simulator.warehouse-systems.svc.cluster.local:80`,
+the gateway route `/api/customer-payments` (Kong, `stripPath`), the A2A agent
+enabled with `/api/a2a/customer-payments`, and the MCP server left off. The
+image tag comes from Terraform. Packaging prerequisites are in
+[Before the first release](/docs/operations/before-first-release).
+
+Startup budget: the first Postgres dial of an injected pod can be reset (Istio
+native sidecars), so migrations and the first ping retry 5 times with backoff
+1, 2, 4 and 8 s (`internal/bootretry`); the chart's startup probe allows about
+60 s (`periodSeconds: 2`, `failureThreshold: 30`).
+
+## Migrations
+
+One embedded migration, `0001_customer_payments_schema` (golang-migrate, in
+`internal/adapters/outbound/postgres/migrations/`), creates `payment_authorizations`,
+`allocations`, `refunds`, `parked_facts`, `processed_events`, `idempotency_keys`
+and `outbox_events`. It runs at boot of **each** of `cmd/api`, `cmd/mcp` and
+`cmd/a2a`; golang-migrate's advisory lock makes concurrent starts safe. Because
+that lock is session-scoped it does not survive PgBouncer transaction pooling,
+so set `MIGRATIONS_DATABASE_URL` (chart: Secret key
+`database.migrationsExistingSecretKey`, optional) to a **direct** DSN when
+`DATABASE_URL` points at PgBouncer. A failed migration refuses boot after the
+retry budget. The migration also ships a `.down.sql`, but no runbook step runs
+it: roll forward.
+
+## Kafka: topics and consumer groups
+
+| Topic | Direction | Group variable | Handled types |
+| --- | --- | --- | --- |
+| `retailnetwork.customer-payments.events` | produced by the outbox relay (key = aggregate id, acks=all) | n/a | the eight event types in [Events](/docs/api-reference/events) |
+| `retailnetwork.checkout.events` | consumed | `CHECKOUT_CONSUMER_GROUP` (suggested `customer-payments-checkout`) | `CheckoutCompleted` |
+| `retailnetwork.order-sourcing.events` | consumed | `ORDER_SOURCING_CONSUMER_GROUP` (`customer-payments-order-sourcing`) | `FulfillmentShipped`, `FulfillmentCancelled`, `FulfillmentUnsourceable` |
+| `retailnetwork.shipping-and-tracking.events` | consumed | `SHIPPING_AND_TRACKING_CONSUMER_GROUP` (`customer-payments-shipping-and-tracking`) | `PackageLost`, `PackageReturned` |
+| `<consumed topic>.dlq` | produced on dead-lettering | n/a | original key, value and headers plus `x-dlq-source-topic`, `x-dlq-source-partition`, `x-dlq-source-offset`, `x-dlq-error`, `x-dlq-failed-at` |
+| `retailnetwork.customer-payments.unbound-facts.dlq` | produced by the policy loop | n/a | JSON of a fulfilment fact whose order stayed unbound for 24 h (`eventId`, `kind`, `orderId`, `groupNo`, `trackingNumbers`, `occurredAt`, `parkedAt`, `reason`) |
+
+The service never creates topics through an admin API; the broker auto-creates
+them on first write (`AllowAutoTopicCreation`). Group ids must be stable: a
+rescheduled pod resumes from its committed offsets, while a **new** group id
+starts from the first offset and replays the whole topic (harmless, because
+every message is claimed in `processed_events` by CloudEvents id, but it parks
+facts for orders this database does not know).
+
+## Dead letters
+
+A consumed message is handled in one database transaction (inbox claim on the
+CloudEvents id plus the effect) and its offset is committed only afterwards.
+A transient failure is retried with backoff 200 ms doubling to 5 s; after 5
+attempts the message is published to `<topic>.dlq`. A payload that can never be
+applied (invalid event, unknown group, capture after expiry, illegal
+transition, order already bound to another authorization) is dead-lettered at
+once. Not-a-CloudEvent messages and unknown types are logged at WARN and
+committed past. To inspect a dead letter, read the `.dlq` topic and look at the
+`x-dlq-error` header; to replay, republish the value to the source topic once
+the cause is fixed (the inbox makes a duplicate harmless).
+
+## Policy loop (the sweepers)
+
+`cmd/api` runs one loop every `POLICY_INTERVAL` (5 s) over four passes, each
+bounded to 200 rows and independent (a failing pass is logged and retried at
+the next tick):
+
+| Pass | Acts on | Effect |
+| --- | --- | --- |
+| `reauthorize-before-expiry` | live authorizations within 24 h of `expires_at` | new provider hold (`PaymentReauthorized`); a decline expires it and raises `PaymentDeclined` with reason `REAUTH_DECLINED`; an already-lapsed hold expires without asking the provider |
+| `void-unbound-authorizations` | `AUTHORIZED` authorizations with no `order_id` after 24 h | voided (the backstop for a checkout that never completed) |
+| `process-requested-refunds` | refunds still `REQUESTED` after 30 s (a provider outage during the request) | settles them against the provider |
+| `maintain-parked-facts` | facts parked more than 24 h | published to `retailnetwork.customer-payments.unbound-facts.dlq` with an `ALERT fact for an unbound order dead-lettered` ERROR line; facts older than the retention (30 days) are purged |
 
 ## Runtime shape (api Deployment: REST, outbox relay, consumers, policy loop)
 
@@ -111,10 +222,11 @@ Notes:
   whose dependencies are down.
 - `GET /metrics` — Prometheus scrape endpoint (`internal/adapters/inbound/http/server.go`).
 
-## Configuration
+## Configuration and chart values
 
-Env vars `cmd/api` reads (contract: `cmd/api/main.go` header comment, validated
-in `cmd/api/config.go`; rendered in
+Env vars `cmd/api` reads (the full per-binary tables are in
+[Configuration](/docs/operations/configuration); contract: `cmd/api/main.go`
+header comment, validated in `cmd/api/config.go`; rendered in
 `charts/customer-payments/templates/deployment.yaml`; the mcp and a2a components read
 the subset marked •):
 
@@ -163,10 +275,14 @@ Behavior — Idempotency-Key middleware (`internal/adapters/inbound/http/idempot
   Export never blocks: a Collector that is down costs telemetry and nothing
   else (`internal/adapters/outbound/telemetry/telemetry.go`).
 - Business metric: the `payments.authorizations.decided` counter
-  (`internal/adapters/outbound/telemetry/payment_metrics.go`), scraped via
-  `GET /metrics`.
-- Pod-restart alerts exist at the fleet level and are the other main automatic
-  signal for this service.
+  (`internal/adapters/outbound/telemetry/payment_metrics.go`), exported over
+  OTLP like every other OTel metric; `GET /metrics` serves only the
+  `customer_payments_parked_facts` gauge.
+- Pod-restart and Kong 5xx alert rules exist at the fleet level, but
+  `warehouse-alert-rules.json` carries no group for this context today; see
+  [Observability](/docs/operations/observability#dashboards-and-alerts). Watch
+  the Grafana dashboard `warehouse-customer-payments` and the log levels
+  instead.
 
 ## Failure modes
 

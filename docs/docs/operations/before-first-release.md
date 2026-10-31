@@ -1,4 +1,34 @@
+---
+id: before-first-release
+title: Before the first release
+sidebar_label: Before the first release
+sidebar_position: 5
+---
+
 # Before the first release: customer-payments
+
+## Status in this repository
+
+Checked against the code on this branch:
+
+| # | Item | State |
+| --- | --- | --- |
+| 1 | Real runtime only | Done. `cmd/**` imports no memory adapter and `cmd/api` refuses to boot without `DATABASE_URL`, `KAFKA_BROKERS`, `PAYMENT_PROVIDER_URL` and the three consumer group ids (see [Configuration](/docs/operations/configuration)). Guarded by `TestRuntimeBinaryHasNoInMemoryAdapters`. |
+| 2 | No Go file at the repo root | Done; godog lives in `internal/bdd/` with the scenarios in `features/`. Guarded by `TestNoGoFilesAtRepoRoot`. |
+| 3 | `Dockerfile` builds every `cmd/*` | Done: a loop over `cmd/*/` builds `api`, `mcp` and `a2a` into `/app`; `ENTRYPOINT ["./api"]`; the chart overrides `command` for the other two. `EXPOSE 8080 8093` omits the MCP port 8090 (cosmetic: Kubernetes ignores `EXPOSE`). |
+| 4 | `.dockerignore` | Present. |
+| 5 | Helm chart | Done: `charts/customer-payments` with `Chart.yaml` name `customer-payments`; three components (api, optional mcp, optional a2a). |
+| 6 | DSN from a Secret | Done (`database.existingSecret` or `database.url` stored in a chart-created Secret). |
+| 7 | Hardening and shutdown room | Done: non-root uid 1000, read-only root filesystem, capabilities dropped; `terminationGracePeriodSeconds` 70 and refused when too small. |
+| 8 | Chart tests | Done: `charts/customer-payments/tests/render_test.sh` and `test_service_selectors.py`, run by the `chart-tests` job. |
+| 9 | Consumer group ids are chart values | Done: `config.checkoutConsumerGroup`, `config.orderSourcingConsumerGroup`, `config.shippingAndTrackingConsumerGroup`, all mandatory. |
+| 10 | Optional CI jobs match the service | `ci.yml` has no `web` and no `docs-api-drift` job (the service has no `web/`); `api-lint` lints `apis/openapi.yaml` and `apis/asyncapi.yaml`. The documentation site has its own workflow, `docs.yml`. |
+| 11 | Registry access | Images push to `ghcr.io/iqvo` with the Actions token. |
+| 12 | `govulncheck` clean | Checked by the `vuln` job on every push; `make vuln` runs the same command. |
+
+The original checklist follows unchanged.
+
+## The checklist
 
 The first merge to `main` runs `docker-publish` and `release`. Two services built from
 this template (pick-face-replenishment, task-interleaving) each needed a rework because
