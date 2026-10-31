@@ -157,8 +157,8 @@ fi
 for stray in frontend projector reports analytics; do
   if grep -qE "app.kubernetes.io/component: .*$stray" <<<"$render_all"; then fail "the chart must not render a $stray component"; fi
 done
-[[ "$(grep -c '^kind: Deployment' <<<"$render_all")" == 1 ]] || fail "exactly one Deployment (the api) must render without mcp.enabled"
-[[ "$(grep -c '^kind: Service$' <<<"$render_all")" == 1 ]] || fail "exactly one Service (the api) must render without mcp.enabled"
+[[ "$(grep -c '^kind: Deployment' <<<"$render_all")" == 1 ]] || fail "exactly one Deployment (the api) must render without mcp.enabled or a2a.enabled"
+[[ "$(grep -c '^kind: Service$' <<<"$render_all")" == 1 ]] || fail "exactly one Service (the api) must render without mcp.enabled or a2a.enabled"
 for off in HorizontalPodAutoscaler Ingress HTTPRoute; do
   if grep -q "^kind: $off" <<<"$(helm template "$release" "$chart_dir" "${base[@]}")"; then fail "$off must be off by default"; fi
   grep -q "^kind: $off" <<<"$render_all" || fail "$off must render when enabled"
@@ -182,7 +182,7 @@ tagged="$(helm template "$release" "$chart_dir" "${base[@]}" --set image.tag=v9.
 [[ "$(env_value "$tagged" OTEL_EXPORTER_OTLP_ENDPOINT)" == "http://collector:4317" ]] || fail "OTEL_EXPORTER_OTLP_ENDPOINT must follow otel.endpoint"
 [[ "$(env_value "$tagged" ENVIRONMENT)" == "staging" ]] || fail "ENVIRONMENT must follow environment"
 # otel.enabled=false renders no OTEL_* env (SERVICE_VERSION stays: it also labels the logs' build).
-otel_off="$(helm template "$release" "$chart_dir" "${base[@]}" --set otel.enabled=false --set mcp.enabled=true)"
+otel_off="$(helm template "$release" "$chart_dir" "${base[@]}" --set otel.enabled=false --set mcp.enabled=true --set a2a.enabled=true)"
 if grep -q 'name: OTEL_' <<<"$otel_off"; then fail "otel.enabled=false must render no OTEL_* env in any component"; fi
 grep -q 'name: SERVICE_VERSION$' <<<"$otel_off" || fail "SERVICE_VERSION must still render with otel.enabled=false"
 # The values are chart-owned: extraEnv may not set them a second time.
@@ -288,12 +288,61 @@ grep -q 'value: /api/mcp/customer-payments' <<<"$mcp_route" || fail "the mcp rou
 grep -q 'replacePrefixMatch: /mcp' <<<"$mcp_route" || fail "the mcp route must rewrite the prefix to /mcp (the SDK's canonical endpoint)"
 grep -q "name: $release-mcp" <<<"$mcp_route" || fail "the mcp route must target the mcp Service"
 
+# --- the optional a2a component (default off, ADR 0005) ---------------------
+# a2a: the read-only Agent2Agent agent. Its own env, never the api ConfigMap,
+# never Kafka/outbox/EVENT_PUBLISHER (cmd/a2a is read-only, like cmd/mcp).
+a2a_dep="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --show-only templates/a2a-deployment.yaml)"
+grep -q 'app.kubernetes.io/component: a2a' <<<"$a2a_dep" || fail "the a2a Deployment was not rendered with a2a.enabled=true"
+grep -q 'command: \["/app/a2a"\]' <<<"$a2a_dep" || fail "the a2a Deployment must run /app/a2a"
+if grep -q 'configMapRef:' <<<"$a2a_dep"; then fail "a2a-deployment.yaml must not mount the api ConfigMap"; fi
+if grep -Eq 'name: (KAFKA_BROKERS|EVENT_PUBLISHER|PAYMENT_PROVIDER_[A-Z_]+|ORDER_SOURCING_[A-Z_]+|SHIPPING_AND_TRACKING_[A-Z_]+|CHECKOUT_[A-Z_]+|OUTBOX_[A-Z_]+|POLICY_INTERVAL|[A-Z]+_CONSUMER_GROUP)$' <<<"$a2a_dep"; then
+  fail "the a2a Deployment must not get Kafka/relay/consumer/provider env (read-only, never dials Kafka)"
+fi
+grep -A4 'name: DATABASE_URL$' <<<"$a2a_dep" | grep -q 'secretKeyRef:' || fail "the a2a DATABASE_URL must come from a Secret"
+[[ "$(env_value "$a2a_dep" A2A_ADDR)" == ":8093" ]] || fail "the a2a agent must listen on :8093 (8090 is the MCP server)"
+# Every variable cmd/a2a reads or names as REQUIRED is rendered, derived from
+# the Go source so a new mandatory variable fails until the chart has it.
+# shellcheck disable=SC2207
+a2a_vars=($(binary_env_of "$repo_dir"/cmd/a2a/main.go "$repo_dir"/cmd/a2a/telemetry.go))
+(( ${#a2a_vars[@]} >= 5 )) || fail "found only ${#a2a_vars[@]} env literals in cmd/a2a; the scan is looking in the wrong place"
+assert_env_rendered "$a2a_dep" "the a2a Deployment" "${a2a_vars[@]}" DATABASE_URL MIGRATIONS_DATABASE_URL A2A_ADDR A2A_AGENT_URL LOG_LEVEL SERVICE_VERSION ENVIRONMENT \
+  OTEL_SERVICE_NAME OTEL_EXPORTER_OTLP_ENDPOINT
+# shellcheck disable=SC2207
+a2a_required=($(grep -hoE '[A-Z][A-Z0-9_]+ is required' "$repo_dir"/cmd/a2a/main.go | sed -E 's/ is required//' | sort -u || true))
+(( ${#a2a_required[@]} >= 2 )) || fail "found only ${#a2a_required[@]} mandatory variables for cmd/a2a; the scan is looking in the wrong place"
+assert_env_rendered "$a2a_dep" "the a2a Deployment (mandatory)" "${a2a_required[@]}"
+# The Agent Card must advertise a dialable absolute URL: it defaults to the
+# release's in-cluster Service DNS (namespace-derived, so pattern-match) and
+# stays overridable.
+a2a_url="$(env_value "$a2a_dep" A2A_AGENT_URL || true)" # a missing var must reach the fail message below, not abort under set -e
+[[ "$a2a_url" =~ ^http://[a-z0-9.-]+-a2a\.[a-z0-9-]+\.svc\.cluster\.local:8093/$ ]] || fail "A2A_AGENT_URL default is not the in-cluster Service DNS: $a2a_url"
+a2a_override="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --set a2a.agentUrl=http://gw.example/api/a2a/customer-payments/ --show-only templates/a2a-deployment.yaml)"
+[[ "$(env_value "$a2a_override" A2A_AGENT_URL)" == "http://gw.example/api/a2a/customer-payments/" ]] || fail "a2a.agentUrl does not override A2A_AGENT_URL"
+[[ "$(env_value "$a2a_dep" SERVICE_VERSION)" == "0.1.0" ]] || fail "the a2a SERVICE_VERSION must default to the image tag / appVersion, like the api"
+[[ "$(env_value "$a2a_dep" OTEL_SERVICE_NAME)" == "customer-payments-a2a" ]] || fail "the a2a component must export as <otel.serviceName>-a2a"
+[[ "$(env_value "$a2a_dep" OTEL_EXPORTER_OTLP_ENDPOINT)" == "$otel_endpoint" ]] || fail "the a2a component must export to otel.endpoint"
+a2a_svc="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --show-only templates/a2a-service.yaml)"
+grep -q 'kind: Service' <<<"$a2a_svc" || fail "the a2a Service was not rendered with a2a.enabled=true"
+grep -q 'app.kubernetes.io/component: a2a' <<<"$a2a_svc" || fail "the a2a Service must select component=a2a"
+# A2A is off by default: no a2a resource renders unless asked for.
+for t in a2a-deployment a2a-service a2a-route; do
+  if helm template "$release" "$chart_dir" "${base[@]}" --show-only "templates/$t.yaml" 2>/dev/null | grep -q '^kind:'; then fail "templates/$t.yaml rendered with default values"; fi
+done
+
+# The a2a route is a SEPARATE switch: a2a on alone exposes nothing.
+a2a_noroute="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true)"
+if grep -q 'kind: HTTPRoute' <<<"$a2a_noroute"; then fail "the a2a HTTPRoute must not render while a2a.route.enabled is false"; fi
+a2a_route="$(helm template "$release" "$chart_dir" "${base[@]}" --set a2a.enabled=true --set a2a.route.enabled=true --show-only templates/a2a-route.yaml)"
+grep -q 'value: /api/a2a/customer-payments' <<<"$a2a_route" || fail "the a2a route must carry its configured host path"
+grep -q 'replacePrefixMatch: /$' <<<"$a2a_route" || fail "the a2a route must rewrite the prefix to / (JSON-RPC root; the agent card stays reachable under the prefix)"
+grep -q "name: $release-a2a" <<<"$a2a_route" || fail "the a2a route must target the a2a Service"
+
 # ALL optional components render TOGETHER (ct lint's values file).
 together="$(helm template "$release" "$chart_dir" -f "$chart_dir/ci/all-components-values.yaml")"
-for component in api mcp; do
+for component in api mcp a2a; do
   grep -q "app.kubernetes.io/component: $component\$" <<<"$together" || fail "the full render lacks the $component component"
 done
-[[ "$(grep -c '^kind: Deployment' <<<"$together")" == 2 ]] || fail "the full render must carry the api and mcp Deployments"
-[[ "$(grep -c '^kind: Service$' <<<"$together")" == 2 ]] || fail "the full render must carry the api and mcp Services"
+[[ "$(grep -c '^kind: Deployment' <<<"$together")" == 3 ]] || fail "the full render must carry the api, mcp and a2a Deployments"
+[[ "$(grep -c '^kind: Service$' <<<"$together")" == 3 ]] || fail "the full render must carry the api, mcp and a2a Services"
 
 echo "PASS: customer-payments chart render assertions"

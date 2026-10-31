@@ -35,3 +35,10 @@ MCP:       {{ include "customer-payments.mcpFullname" . }} ({{ .Values.mcp.servi
 Route:     {{ .Values.mcp.route.path }} -> /mcp via the Gateway parentRefs.
 {{- end }}
 {{- end }}
+{{- if .Values.a2a.enabled }}
+
+A2A:       {{ include "customer-payments.a2aFullname" . }} ({{ .Values.a2a.service.type }}, port {{ .Values.a2a.service.port }}) - Agent2Agent JSON-RPC on / and /a2a, Agent Card at /.well-known/agent-card.json, read-only.
+{{- if .Values.a2a.route.enabled }}
+Route:     {{ .Values.a2a.route.path }} -> / via the Gateway parentRefs.
+{{- end }}
+{{- end }}
