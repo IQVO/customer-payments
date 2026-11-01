@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/IQVO/customer-payments/internal/adapters/inbound/http/page"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/application/provider"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
@@ -52,6 +53,9 @@ var problemCatalogue = []struct {
 	p   problem
 }{
 	{errMalformedRequest, problem{http.StatusBadRequest, "malformed-request", "Malformed request"}},
+	{page.ErrInvalidLimit, problem{http.StatusBadRequest, "invalid-limit", "limit must be an integer between 1 and 500"}},
+	{page.ErrInvalidCursor, problem{http.StatusBadRequest, "invalid-cursor", "cursor is not a valid page token"}},
+	{errUnknownQueryParameter, problem{http.StatusBadRequest, "unknown-query-parameter", "The collection does not declare this query parameter"}},
 	{ports.ErrNotFound, notFound},
 	{provider.ErrUnavailable, problem{http.StatusServiceUnavailable, "payment-provider-unavailable", "The payment provider is unavailable; retry with the same Idempotency-Key"}},
 	{provider.ErrDeclined, unprocessable("payment-declined", "The payment provider declined the operation")},

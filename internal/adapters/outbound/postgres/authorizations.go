@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/IQVO/customer-payments/internal/adapters/outbound/postgres/pgtx"
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
 )
@@ -116,6 +118,19 @@ func (r *AuthorizationRepository) FindLiveBySession(ctx context.Context, session
 // ListBySession implements ports.AuthorizationRepository.
 func (r *AuthorizationRepository) ListBySession(ctx context.Context, sessionID string) ([]*paymentauthorization.PaymentAuthorization, error) {
 	return r.find(ctx, `WHERE checkout_session_id = $1 ORDER BY created_at, authorization_id`, sessionID)
+}
+
+// PageBySession implements ports.AuthorizationRepository: (created_at,
+// authorization_id) ascending, strictly after the keyset, at most limit rows.
+// The row comparison walks the payment_authorizations_session_idx index.
+func (r *AuthorizationRepository) PageBySession(ctx context.Context, sessionID string, after *pagination.Keyset, limit int) ([]*paymentauthorization.PaymentAuthorization, error) {
+	clause, args := `WHERE checkout_session_id = $1`, []any{sessionID}
+	if after != nil {
+		clause += ` AND (created_at, authorization_id) > ($2, $3)`
+		args = append(args, after.CreatedAt.UTC(), after.ID)
+	}
+	args = append(args, limit)
+	return r.find(ctx, clause+` ORDER BY created_at, authorization_id LIMIT $`+strconv.Itoa(len(args)), args...)
 }
 
 // FindByOrder implements ports.AuthorizationRepository.

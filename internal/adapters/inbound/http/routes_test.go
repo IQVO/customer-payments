@@ -64,14 +64,14 @@ func TestGetAndListAuthorizations(t *testing.T) {
 	for _, q := range []string{"?orderId=ord-1", "?checkoutSessionId=cs-1"} {
 		l := e.get("/payment-authorizations" + q)
 		e.wantStatus(l, http.StatusOK)
-		if got := l.json(t)["authorizations"].([]any); len(got) != 1 {
+		if got := l.json(t)["items"].([]any); len(got) != 1 {
 			t.Fatalf("%s: %s", q, l.Body)
 		}
 	}
 	e.wantProblem(e.get("/payment-authorizations"), http.StatusUnprocessableEntity, "validation-failed")
 	empty := e.get("/payment-authorizations?orderId=ord-9")
 	e.wantStatus(empty, http.StatusOK)
-	if !strings.Contains(empty.Body, `"authorizations":[]`) {
+	if !strings.Contains(empty.Body, `"items":[]`) {
 		t.Fatalf("empty list = %s", empty.Body)
 	}
 }
@@ -111,7 +111,7 @@ func TestRefundRoutes(t *testing.T) {
 	e.wantStatus(g, http.StatusOK)
 	l := e.get("/refunds?orderId=ord-1")
 	e.wantStatus(l, http.StatusOK)
-	if got := l.json(t)["refunds"].([]any); len(got) != 1 {
+	if got := l.json(t)["items"].([]any); len(got) != 1 {
 		t.Fatalf("list = %s", l.Body)
 	}
 	e.wantProblem(e.get("/refunds"), http.StatusUnprocessableEntity, "validation-failed")

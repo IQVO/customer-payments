@@ -14,7 +14,7 @@ import (
 // carries the SAME read use cases the REST adapter uses (GET
 // /payment-authorizations, /payment-authorizations/{id}, /refunds,
 // /refunds/{id}); it holds no write use case at all: POST /payment-authorizations,
-// :void, POST /refunds and :retry stay REST-only.
+// POST .../voids, POST /refunds and :retry stay REST-only.
 type Deps struct {
 	GetAuthorization   *usecases.GetAuthorization
 	ListAuthorizations *usecases.ListAuthorizations
@@ -147,7 +147,7 @@ func (d Deps) getPaymentAuthorization(ctx context.Context, in authorizationIDInp
 }
 
 func (d Deps) listPaymentAuthorizations(ctx context.Context, in listAuthorizationsInput) (authorizationList, error) {
-	list, err := d.ListAuthorizations.Execute(ctx, in.OrderID, in.CheckoutSessionID)
+	list, err := d.ListAuthorizations.All(ctx, in.OrderID, in.CheckoutSessionID)
 	if err != nil {
 		return authorizationList{}, mapError(err)
 	}
@@ -171,7 +171,7 @@ func (d Deps) getRefund(ctx context.Context, in refundIDInput) (refundView, erro
 }
 
 func (d Deps) listRefunds(ctx context.Context, in listRefundsInput) (refundList, error) {
-	list, err := d.ListRefunds.Execute(ctx, in.OrderID)
+	list, err := d.ListRefunds.All(ctx, in.OrderID)
 	if err != nil {
 		return refundList{}, mapError(err)
 	}
@@ -200,7 +200,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 	addTool(server, &mcp.Tool{
 		Name: "list_payment_authorizations",
 		Description: "List the payment authorizations of one order (orderId) or of one checkout session (checkoutSessionId, declined " +
-			"attempts included). Give exactly one of the two. Read-only.",
+			"attempts included), oldest first, at most 1000. Give exactly one of the two. Read-only.",
 		Annotations: readOnly,
 	}, d.listPaymentAuthorizations)
 	addTool(server, &mcp.Tool{
@@ -211,7 +211,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 	}, d.getRefund)
 	addTool(server, &mcp.Tool{
 		Name:        "list_refunds",
-		Description: "List the refunds of one order, oldest first. Read-only.",
+		Description: "List the refunds of one order, oldest first, at most 1000. Read-only.",
 		Annotations: readOnly,
 	}, d.listRefunds)
 }

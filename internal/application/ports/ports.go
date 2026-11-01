@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/IQVO/customer-payments/internal/application/idempotency"
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/parked"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
 	"github.com/IQVO/customer-payments/internal/domain/refund"
@@ -34,6 +35,11 @@ type AuthorizationRepository interface {
 	// ListBySession returns every authorization of the session, oldest first
 	// (declined attempts included).
 	ListBySession(ctx context.Context, sessionID string) ([]*paymentauthorization.PaymentAuthorization, error)
+	// PageBySession returns up to limit authorizations of the session (declined
+	// attempts included) ordered by (created-at, id) ascending. A non-nil after
+	// resumes strictly after that keyset, so authorizations sharing a created-at
+	// are never skipped or repeated.
+	PageBySession(ctx context.Context, sessionID string, after *pagination.Keyset, limit int) ([]*paymentauthorization.PaymentAuthorization, error)
 	// FindByOrder returns the authorization bound to the order, or ErrNotFound.
 	FindByOrder(ctx context.Context, orderID string) (*paymentauthorization.PaymentAuthorization, error)
 	// FindByTracking returns the authorization one of whose allocations
@@ -57,8 +63,10 @@ type RefundRepository interface {
 	// Save persists the refund under the concurrency rule of the package
 	// comment.
 	Save(ctx context.Context, r *refund.Refund) error
-	// ListByOrder returns the refunds of the order, oldest first.
-	ListByOrder(ctx context.Context, orderID string) ([]*refund.Refund, error)
+	// ListByOrder returns up to limit refunds of the order ordered by
+	// (created-at, id) ascending. A non-nil after resumes strictly after that
+	// keyset, so refunds sharing a created-at are never skipped or repeated.
+	ListByOrder(ctx context.Context, orderID string, after *pagination.Keyset, limit int) ([]*refund.Refund, error)
 	// ListByAuthorization returns the refunds made through the authorization,
 	// oldest first.
 	ListByAuthorization(ctx context.Context, id paymentauthorization.ID) ([]*refund.Refund, error)

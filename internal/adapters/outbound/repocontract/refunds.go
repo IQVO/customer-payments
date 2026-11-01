@@ -47,7 +47,7 @@ func testRefunds(t *testing.T, e Env) {
 
 func refundLists(t *testing.T, e Env) {
 	fatalIf(t, e.Refunds.Save(ctx(), newRefund(t, "ref-2", "pay-1", "ord-1", 5)), "second refund")
-	byOrder, err := e.Refunds.ListByOrder(ctx(), "ord-1")
+	byOrder, err := e.Refunds.ListByOrder(ctx(), "ord-1", nil, 100)
 	fatalIf(t, err, "list by order")
 	if len(byOrder) != 2 || byOrder[0].ID() != "ref-1" {
 		t.Fatalf("by order = %d", len(byOrder))
@@ -57,7 +57,7 @@ func refundLists(t *testing.T, e Env) {
 	if len(byAuth) != 2 {
 		t.Fatalf("by authorization = %d", len(byAuth))
 	}
-	empty, err := e.Refunds.ListByOrder(ctx(), "ord-none")
+	empty, err := e.Refunds.ListByOrder(ctx(), "ord-none", nil, 100)
 	fatalIf(t, err, "list empty")
 	if len(empty) != 0 {
 		t.Fatalf("empty list = %d", len(empty))

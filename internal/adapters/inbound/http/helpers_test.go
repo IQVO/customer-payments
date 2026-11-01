@@ -136,10 +136,15 @@ func (e *env) authorized() string {
 	return r.json(e.t)["authorizationId"].(string)
 }
 
+// authorizeBodyFor is the default authorize body for another checkout session.
+func authorizeBodyFor(session string) string {
+	return strings.Replace(authorizeBody, "cs-1", session, 1)
+}
+
 // authorizedSession authorizes the default body for another checkout session.
 func (e *env) authorizedSession(session string) string {
 	e.t.Helper()
-	r := e.post("/payment-authorizations", strings.Replace(authorizeBody, "cs-1", session, 1))
+	r := e.post("/payment-authorizations", authorizeBodyFor(session))
 	e.wantStatus(r, http.StatusCreated)
 	return r.json(e.t)["authorizationId"].(string)
 }

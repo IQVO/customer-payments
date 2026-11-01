@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
 )
@@ -66,6 +67,19 @@ func (r *AuthorizationRepository) FindLiveBySession(ctx context.Context, session
 func (r *AuthorizationRepository) ListBySession(ctx context.Context, sessionID string) ([]*paymentauthorization.PaymentAuthorization, error) {
 	defer r.s.enter(ctx)()
 	return r.restoreAll(r.sorted(func(s paymentauthorization.Snapshot) bool { return s.CheckoutSessionID == sessionID }))
+}
+
+// PageBySession implements ports.AuthorizationRepository: (created-at, id)
+// ascending, strictly after the keyset, at most limit rows.
+func (r *AuthorizationRepository) PageBySession(ctx context.Context, sessionID string, after *pagination.Keyset, limit int) ([]*paymentauthorization.PaymentAuthorization, error) {
+	defer r.s.enter(ctx)()
+	snaps := r.sorted(func(s paymentauthorization.Snapshot) bool {
+		return s.CheckoutSessionID == sessionID && after.Admits(s.CreatedAt, string(s.ID))
+	})
+	if limit >= 0 && len(snaps) > limit {
+		snaps = snaps[:limit]
+	}
+	return r.restoreAll(snaps)
 }
 
 func (r *AuthorizationRepository) restoreAll(snaps []paymentauthorization.Snapshot) ([]*paymentauthorization.PaymentAuthorization, error) {
