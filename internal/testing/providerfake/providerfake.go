@@ -77,7 +77,7 @@ func (f *Fake) Calls() []string {
 }
 
 // Effects counts the distinct idempotency keys that took effect for the
-// operation (authorize, captures, refunds, void, reauthorize, reduce).
+// operation (authorize, captures, refunds, voids, reauthorizations, reductions).
 func (f *Fake) Effects(operation string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -144,7 +144,7 @@ func (f *Fake) approve(op string) answer {
 	f.seq++
 	id := fmt.Sprintf("%s-%d", op, f.seq)
 	switch op {
-	case "authorize", "reauthorize":
+	case "authorize", "reauthorizations":
 		return answer{http.StatusOK, map[string]any{"id": id, "expiresAt": time.Now().UTC().Add(f.Validity).Format(time.RFC3339Nano)}}
 	case "captures", "refunds":
 		return answer{http.StatusCreated, map[string]any{"id": id}}
