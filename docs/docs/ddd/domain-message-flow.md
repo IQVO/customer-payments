@@ -37,7 +37,7 @@ sequenceDiagram
         CP-->>CK: reply 201 DECLINED<br/>session stays open
     end
     opt the place-order step is definitively rejected
-        CK->>CP: cmd: VoidAuthorization<br/>POST ...:void
+        CK->>CP: cmd: VoidAuthorization<br/>POST .../voids
         CP->>PSP: cmd: Void
         CP->>K: evt: paymentauthorization.PaymentReleased VOIDED
         CP-->>CK: reply 200 VOIDED

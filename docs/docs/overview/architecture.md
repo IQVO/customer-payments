@@ -119,7 +119,7 @@ shared by the three binaries (`cmd/api` is the only writer):
 | `refunds` | The `Refund` aggregate: `state`, `attempts`, `failure_code`, `provider_refund_id`, `version`. |
 | `parked_facts` | Fulfilment and tracking facts whose order is not bound yet (or whose tracking number no capture carries yet), with `parked_at` and `escalated_at`. |
 | `processed_events` | The inbox: one row per consumed CloudEvents `id`. |
-| `idempotency_keys` | Stored answers of the `POST` routes, keyed by `(route, key)` with a request hash. |
+| `idempotency_keys` | Stored answers of the `POST` routes, one row per global Idempotency-Key (the `route` column is always empty) with a request hash; written in the transaction of the aggregate change and its outbox rows. |
 | `outbox_events` | The transactional outbox: encoded CloudEvents, topic, key, headers (including `traceparent`), `published_at`, `attempts`, `last_error`. |
 
 Postgres is the only store; the service refuses to boot without `DATABASE_URL`.

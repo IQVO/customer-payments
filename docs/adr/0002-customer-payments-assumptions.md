@@ -32,7 +32,7 @@ the decisions win; everything else the model leaves open is recorded here and li
   header; the same key returns the same answer. Bodies are JSON, amounts are integer minor units,
   only PSP tokens travel (never a card number).
   - `POST /authorizations` `{amountMinor, currency, paymentMethodToken, reference}` returns a hold id and its expiry; a declined token answers with a decline code.
-  - `POST /authorizations/{id}/void`, `/reauthorize` `{amountMinor}`, `/reduce` `{amountMinor}` (partial release, H4), `/captures` `{amountMinor}` and `/refunds` `{amountMinor}`.
+  - `POST /authorizations/{id}/voids`, `/reauthorizations` `{amountMinor}`, `/reductions` `{amountMinor}` (partial release, H4), `/captures` `{amountMinor}` and `/refunds` `{amountMinor}` (the noun routes of the fleet REST guideline, [ADR 0006](./0006-adopt-the-fleet-rest-api-guideline.md); the verb spellings `/void`, `/reauthorize` and `/reduce` are retired).
   - A 4xx decline is final; 5xx and transport errors are transient and retried by the caller.
 - **A13** The tracking number of a captured group is stored at capture (H6); a refund for a lost or
   returned package finds its group by tracking number.

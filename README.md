@@ -164,7 +164,7 @@ Logs, metrics and traces follow the fleet standard ([ADR 0004](docs/adr/0004-fle
 
 ## API
 
-REST contract: [`apis/openapi.yaml`](apis/openapi.yaml) — called by checkout (authorize, void) and by storefront ops (refunds, reads). Every write takes an `Idempotency-Key` header; provider keys are deterministic per (operation, authorizationId, groupNo). No authentication. Errors are RFC 9457 problem details (`application/problem+json`) whose `type` is `/problems/<slug>`: shared types `not-found` (404), `illegal-transition` (409), `concurrent-update` (409), `validation-failed` (422), plus one kebab-case slug per model error.
+REST contract: [`apis/openapi.yaml`](apis/openapi.yaml) — called by checkout (authorize, void) and by storefront ops (refunds, reads). Every `POST` takes an `Idempotency-Key` header (1 to 128 printable ASCII characters; the key is global): a retry with the same request replays the stored answer with `Idempotency-Replayed: true`, the same key with another request is `409 idempotency-key-reused`. The two collection `GET`s are keyset-paged (`limit` 1 to 500, opaque `cursor`, body `{items, nextCursor}`). Provider keys are deterministic per (operation, authorizationId, groupNo). No authentication. Errors are RFC 9457 problem details (`application/problem+json`) whose `type` is `/problems/<slug>`: shared types `not-found` (404), `illegal-transition` (409), `concurrent-update` (409), `validation-failed` (422), the idempotency problems `idempotency-key-required` and `idempotency-key-invalid` (400) and `idempotency-key-reused` (409), the paging problems `invalid-limit`, `invalid-cursor` and `unknown-query-parameter` (400), plus one kebab-case slug per model error. See [ADR 0006](docs/adr/0006-adopt-the-fleet-rest-api-guideline.md).
 
 Routes served by `cmd/api`:
 
@@ -173,9 +173,9 @@ Routes served by `cmd/api`:
 | `POST` | `/payment-authorizations` | Authorize at checkout (Idempotency-Key) |
 | `GET` | `/payment-authorizations` | List; exactly one of `orderId` or `checkoutSessionId` required |
 | `GET` | `/payment-authorizations/{authorizationId}` | Get one |
-| `POST` | `/payment-authorizations/{authorizationId}:void` | Void before capture (Idempotency-Key) |
+| `POST` | `/payment-authorizations/{authorizationId}/voids` | Void before capture (Idempotency-Key) |
 | `POST` | `/refunds` | Request a refund (Idempotency-Key) |
-| `GET` | `/refunds` | List refunds |
+| `GET` | `/refunds` | List refunds of an order (`limit`, `cursor`) |
 | `GET` | `/refunds/{refundId}` | Get one refund |
 | `POST` | `/refunds/{refundId}:retry` | Retry a failed refund (Idempotency-Key) |
 | `GET` | `/healthz`, `/readyz`, `/metrics` | Liveness, readiness (gates on Postgres+Kafka), the parked-facts gauge |

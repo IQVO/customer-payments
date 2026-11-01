@@ -46,7 +46,7 @@ thick = Kafka.
 
 | Neighbour | Direction | Pattern | Channel | Messages |
 | --- | --- | --- | --- | --- |
-| `checkout` (Supporting) | we are upstream | Customer/Supplier (checkout is the Customer) | REST `POST /payment-authorizations`, `POST /payment-authorizations/{authorizationId}:void`, `GET /payment-authorizations/{authorizationId}` | authorize, void, get |
+| `checkout` (Supporting) | we are upstream | Customer/Supplier (checkout is the Customer) | REST `POST /payment-authorizations`, `POST /payment-authorizations/{authorizationId}/voids`, `GET /payment-authorizations/{authorizationId}` | authorize, void, get |
 | `checkout` | checkout is upstream | Customer/Supplier (we are the Customer) | Kafka `retailnetwork.checkout.events` | `CheckoutCompleted` |
 | storefront ops, agents | we are upstream | UI | REST `POST /refunds`, `GET /refunds...`, `GET /payment-authorizations...`; MCP `cmd/mcp`; A2A `cmd/a2a` | request, retry and read |
 | `order-sourcing` (network, Core) | network is upstream | Conformist | Kafka `retailnetwork.order-sourcing.events` | `FulfillmentShipped`, `FulfillmentCancelled`, `FulfillmentUnsourceable` |

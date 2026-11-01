@@ -110,7 +110,7 @@ and indexes); the repositories in `internal/adapters/outbound/postgres/*.go`.
 | `refunds` | `refund_id` | the `Refund` root; FK to the authorization; `CHECK` reason (`LOST`, `RETURNED_TO_SENDER`, `MANUAL`), state, `amount_minor >= 1`. |
 | `parked_facts` | `event_id` | facts waiting for a bind (`kind` in `SHIPPED`, `CANCELLED`, `UNSOURCEABLE`, `LOST`, `RETURNED`); `escalated_at` marks the 24 h escalation. |
 | `processed_events` | `event_id` | the inbox: one row per consumed CloudEvents id. |
-| `idempotency_keys` | `(route, key)` | stored REST answers with a request hash; replayed with `Idempotent-Replayed: true`. |
+| `idempotency_keys` | `(route, key)`, `route` always `''` | stored REST answers with a request hash, one per global Idempotency-Key; replayed with `Idempotency-Replayed: true`. |
 | `outbox_events` | `id` | the transactional outbox the relay drains; `event_id` unique; `published_at IS NULL` is the work queue (partial index); `attempts` and `last_error` feed the attempt cap. |
 
 ## Constraints worth knowing
