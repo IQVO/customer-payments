@@ -136,6 +136,14 @@ func (e *env) authorized() string {
 	return r.json(e.t)["authorizationId"].(string)
 }
 
+// authorizedSession authorizes the default body for another checkout session.
+func (e *env) authorizedSession(session string) string {
+	e.t.Helper()
+	r := e.post("/payment-authorizations", strings.Replace(authorizeBody, "cs-1", session, 1))
+	e.wantStatus(r, http.StatusCreated)
+	return r.json(e.t)["authorizationId"].(string)
+}
+
 // shipped binds ord-1 and captures both groups through the consumer.
 func (e *env) shipped() string {
 	e.t.Helper()

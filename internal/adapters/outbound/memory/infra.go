@@ -2,6 +2,8 @@ package memory
 
 import (
 	"context"
+	"net/http"
+	"time"
 
 	"github.com/IQVO/customer-payments/internal/application/idempotency"
 	"github.com/IQVO/customer-payments/internal/application/ports"
@@ -43,10 +45,16 @@ func (o *Outbox) Append(ctx context.Context, events ...shared.Event) error {
 // panics.
 type UnitOfWork struct{ s *Store }
 
-// Do implements ports.UnitOfWork.
+// Do implements ports.UnitOfWork. A Do inside a Do joins it but is atomic on its
+// own (the state taken before the inner fn is restored when only the inner fn
+// fails), like the Postgres savepoint.
 func (u *UnitOfWork) Do(ctx context.Context, fn func(ctx context.Context) error) (err error) {
 	if ctx.Value(txKey{u.s}) != nil {
-		return fn(ctx)
+		before := u.s.capture()
+		if err = fn(ctx); err != nil {
+			u.s.restore(before)
+		}
+		return err
 	}
 	u.s.mu.Lock()
 	defer u.s.mu.Unlock()
@@ -64,30 +72,37 @@ func (u *UnitOfWork) Do(ctx context.Context, fn func(ctx context.Context) error)
 	return nil
 }
 
-// IdempotencyStore is the in-memory ports.IdempotencyStore.
+// IdempotencyStore is the in-memory ports.IdempotencyStore. Records older than
+// idempotency.TTL are treated as absent.
 type IdempotencyStore struct{ s *Store }
 
-func (i *IdempotencyStore) fresh(rec idempotency.Record) bool {
-	return rec.CreatedAt.After(i.s.now().Add(-idempotency.TTL))
-}
-
-// Get implements ports.IdempotencyStore.
-func (i *IdempotencyStore) Get(ctx context.Context, route, key string) (idempotency.Record, error) {
-	defer i.s.enter(ctx)()
-	rec, ok := i.s.idempotency[idemKey{route, key}]
-	if !ok || !i.fresh(rec) {
-		return idempotency.Record{}, ports.ErrNotFound
+// Do implements ports.IdempotencyStore. Like a unit of work it holds the store
+// while fn runs, so same-key requests are serialised and a failed or 5xx fn
+// leaves no write behind.
+func (i *IdempotencyStore) Do(ctx context.Context, key, requestHash string, at time.Time,
+	fn func(ctx context.Context) (idempotency.Record, error),
+) (idempotency.Record, bool, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	if old, ok := i.s.idempotency[key]; ok && i.s.now().Sub(old.CreatedAt) <= idempotency.TTL {
+		return old, true, nil
 	}
-	return rec, nil
-}
-
-// Put implements ports.IdempotencyStore: it stores the record unless a fresh one
-// exists.
-func (i *IdempotencyStore) Put(ctx context.Context, route, key string, rec idempotency.Record) (bool, error) {
-	defer i.s.enter(ctx)()
-	if old, ok := i.s.idempotency[idemKey{route, key}]; ok && i.fresh(old) {
-		return false, nil
+	before := i.s.capture()
+	stored := false
+	defer func() {
+		if !stored {
+			i.s.restore(before)
+		}
+	}()
+	rec, err := fn(context.WithValue(ctx, txKey{i.s}, true))
+	if err != nil {
+		return idempotency.Record{}, false, err
 	}
-	i.s.idempotency[idemKey{route, key}] = rec
-	return true, nil
+	if rec.Status >= http.StatusInternalServerError {
+		return rec, false, nil
+	}
+	rec.RequestHash, rec.CreatedAt = requestHash, at
+	i.s.idempotency[key] = rec
+	stored = true
+	return rec, false, nil
 }

@@ -110,13 +110,23 @@ type UnitOfWork interface {
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// IdempotencyStore remembers the first response per (route, key) for 24 hours.
+// IdempotencyStore remembers the first answer per Idempotency-Key for 24 hours and
+// serialises the requests that share a key (REST guideline 2.3 and 2.5). The key is
+// global: the same key on another route is a different fingerprint (a reuse).
 type IdempotencyStore interface {
-	// Get returns the stored record, or ErrNotFound (expired records are
-	// treated as absent).
-	Get(ctx context.Context, route, key string) (idempotency.Record, error)
-	// Put stores the record unless one exists; it reports whether it stored.
-	Put(ctx context.Context, route, key string, rec idempotency.Record) (bool, error)
+	// Do runs fn at most once for a live key.
+	//
+	// A live record is returned with replayed true and fn does not run; the
+	// caller compares the record's RequestHash with its own. Otherwise Do claims
+	// the key and runs fn with a ctx that carries the unit of work: everything fn
+	// writes through the repositories, the outbox included, commits atomically
+	// with the record fn returns, stamped with at. A record with a status below
+	// 500 is stored (a 4xx too, so a retry is deterministic). A 5xx record, an
+	// error or a panic rolls everything back and stores nothing, so the retry
+	// runs fn again. A concurrent Do for the same key waits for the claimant,
+	// then replays its answer (or runs fn itself when nothing was stored).
+	Do(ctx context.Context, key, requestHash string, at time.Time,
+		fn func(ctx context.Context) (idempotency.Record, error)) (rec idempotency.Record, replayed bool, err error)
 }
 
 // Clock is the service's notion of "now"; use cases stamp aggregates with it.

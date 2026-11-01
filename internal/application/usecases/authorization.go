@@ -108,7 +108,7 @@ func (u AuthorizePayment) create(ctx context.Context, in AuthorizePaymentInput) 
 }
 
 // VoidAuthorization is the command VoidAuthorization
-// (POST /payment-authorizations/{authorizationId}:void).
+// (POST /payment-authorizations/{authorizationId}/voids).
 type VoidAuthorization struct{ Deps }
 
 // Execute voids an uncaptured authorization at the provider and releases its
