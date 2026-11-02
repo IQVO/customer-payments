@@ -94,6 +94,10 @@ func (s *Server) handleVoid(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRequestRefund(w http.ResponseWriter, r *http.Request) {
+	if s.DisableRefunds {
+		writeError(w, r, errRefundsDisabled)
+		return
+	}
 	var req refundRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, r, err)

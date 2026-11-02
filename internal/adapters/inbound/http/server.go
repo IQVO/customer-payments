@@ -34,6 +34,11 @@ type Server struct {
 	// POST route.
 	IdempotencyStore ports.IdempotencyStore
 	Clock            ports.Clock
+	// DisableRefunds is the ops kill switch of POST /refunds
+	// (REFUNDS_ENABLED=false): while set, the route answers 503
+	// refunds-disabled instead of creating a manual refund. Zero (unset)
+	// keeps the route enabled, so the default behavior is unchanged.
+	DisableRefunds bool
 	// ParkedFacts backs the gauge of GET /metrics (H10): how many fulfilment
 	// facts wait for their order to be bound; nil omits the gauge.
 	ParkedFacts func(ctx context.Context) (int, error)

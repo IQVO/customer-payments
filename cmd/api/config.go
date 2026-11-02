@@ -105,6 +105,22 @@ func outboxMaxAttempts(raw string, logger *slog.Logger) int {
 	return n
 }
 
+// refundsEnabled reads REFUNDS_ENABLED, the ops kill switch of POST
+// /refunds (portfolio rec 2026-11-02): unset = enabled (behavior
+// unchanged), "false"/"0" = the route answers 503 refunds-disabled.
+// Anything else logs a warning and enables the route, so a typo can never
+// silently turn refunds off.
+func refundsEnabled(env func(string) string, logger *slog.Logger) bool {
+	switch strings.ToLower(strings.TrimSpace(env("REFUNDS_ENABLED"))) {
+	case "false", "0":
+		return false
+	case "", "true", "1":
+		return true
+	}
+	logger.Warn("invalid REFUNDS_ENABLED; manual refunds stay enabled", "value", env("REFUNDS_ENABLED"))
+	return true
+}
+
 // shutdownDrainDelay reads SHUTDOWN_DRAIN_DELAY ("0" disables; unset, negative
 // or unparsable = the default).
 func shutdownDrainDelay(logger *slog.Logger) time.Duration {

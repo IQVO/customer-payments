@@ -21,7 +21,7 @@ func testAuthorizations(t *testing.T, e Env) {
 	wantErr(t, e.Authorizations.Save(ctx(), newAuth(t, "pay-1", "cs-other", 0)), ports.ErrConcurrentUpdate)
 
 	// capture, bind, save at the loaded version, then read back
-	_, err = got.Capture(1, 7000, []string{"TRK1", "TRK2"}, "cap-1", at(5))
+	_, err = got.Capture(1, 7000, []string{firstTracking, "TRK2"}, "cap-1", at(5))
 	fatalIf(t, err, "capture")
 	_, err = got.BindOrder("ord-1")
 	fatalIf(t, err, "bind")
@@ -31,7 +31,7 @@ func testAuthorizations(t *testing.T, e Env) {
 	again, err := e.Authorizations.Get(ctx(), "pay-1")
 	fatalIf(t, err, "get updated")
 	sameAuth(t, again, got)
-	if a, _ := again.Allocation(1); a.TrackingNumber() != "TRK1" || len(a.TrackingNumbers) != 2 || a.ProviderCaptureID != "cap-1" {
+	if a, _ := again.Allocation(1); a.TrackingNumber() != firstTracking || len(a.TrackingNumbers) != 2 || a.ProviderCaptureID != "cap-1" {
 		t.Fatalf("allocation 1 = %+v", a)
 	}
 	if _, err = stale.BindOrder("ord-1"); err != nil {
@@ -53,12 +53,12 @@ func testSessionUniqueness(t *testing.T, e Env) {
 	d1, d2 := declinedAuth(t, "pay-d1", "cs-2"), declinedAuth(t, "pay-d2", "cs-2")
 	fatalIf(t, e.Authorizations.Save(ctx(), d1), "save first declined")
 	fatalIf(t, e.Authorizations.Save(ctx(), d2), "declined attempts may repeat")
-	fatalIf(t, e.Authorizations.Save(ctx(), newAuth(t, "pay-c", "cs-2", 2)), "a live one after declined attempts")
+	fatalIf(t, e.Authorizations.Save(ctx(), newAuth(t, liveAuthID, "cs-2", 2)), "a live one after declined attempts")
 	wantErr(t, e.Authorizations.Save(ctx(), newAuth(t, "pay-e", "cs-2", 3)), ports.ErrConcurrentUpdate)
 
 	live, err := e.Authorizations.FindLiveBySession(ctx(), "cs-2")
 	fatalIf(t, err, "find live")
-	if live.ID() != "pay-c" {
+	if live.ID() != liveAuthID {
 		t.Fatalf("live = %s", live.ID())
 	}
 	all, err := e.Authorizations.ListBySession(ctx(), "cs-2")

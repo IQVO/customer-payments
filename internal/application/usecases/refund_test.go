@@ -1,7 +1,10 @@
 package usecases_test
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,4 +184,38 @@ func TestPackageReturnedRefundsWithItsReason(t *testing.T) {
 	}
 	bad := usecases.Fact{Kind: parked.Lost, OrderID: "ord-1"}
 	wantErr(t, e.fact("evt-bad", bad), usecases.ErrInvalidEvent)
+}
+
+// TestManualRefundIsAuditLogged covers the portfolio rec "audit-log every
+// manual refund": every POST /refunds execution writes one AUDIT record with
+// who (system: the route carries no operator identity yet), what (refund,
+// order, authorization, amount, currency, reason, group, state) and when
+// (the refund's created_at; the record's own timestamp is the log line's).
+func TestManualRefundIsAuditLogged(t *testing.T) {
+	e := newEnv(t)
+	e.shippedBoth()
+	var buf bytes.Buffer
+	e.deps.Log = slog.New(slog.NewTextHandler(&buf, nil))
+	v, err := usecases.RequestRefund{Deps: e.deps}.Execute(context.Background(), manual(2500))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	for _, want := range []string{
+		"AUDIT manual refund created",
+		"actor=system",
+		"action=manual-refund",
+		"refund_id=" + v.RefundID,
+		"authorization_id=pay-1",
+		"order_id=ord-1",
+		"amount_minor=2500",
+		"currency=BRL",
+		"reason=MANUAL",
+		"state=SUCCEEDED",
+		"created_at=",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("audit record missing %q; got %s", want, got)
+		}
+	}
 }

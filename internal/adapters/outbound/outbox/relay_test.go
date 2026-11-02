@@ -36,7 +36,7 @@ func (s *fakeStore) Drain(ctx context.Context, limit, maxAttempts int, send func
 		if err := send(ctx, s.rows[i]); err != nil {
 			s.sendErrs = append(s.sendErrs, err)
 			s.rows = s.rows[n:]
-			return n, &outbox.SendFailure{RowID: int64(i + 1), Message: s.rows[0], Attempts: s.failAt[i], Err: err}
+			return n, &outbox.SendFailureError{RowID: int64(i + 1), Message: s.rows[0], Attempts: s.failAt[i], Err: err}
 		}
 		n++
 	}
@@ -106,7 +106,7 @@ func TestAFailingRowIsLoggedOnceWhenItReachesTheCap(t *testing.T) {
 		sink := &fakeSink{fail: errors.New("broker down")}
 		r := relay.NewRelay(store, sink, logger, relay.WithMaxAttempts(c.cap))
 		n, err := r.RelayOnce(context.Background())
-		var sf *outbox.SendFailure
+		var sf *outbox.SendFailureError
 		if n != 0 || !errors.As(err, &sf) || !strings.Contains(err.Error(), "broker down") {
 			t.Fatalf("n=%d err=%v", n, err)
 		}

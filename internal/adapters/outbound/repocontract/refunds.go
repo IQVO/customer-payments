@@ -75,7 +75,7 @@ func refundLists(t *testing.T, e Env) {
 
 func parkedFact(eventID, order string, m int) parked.Fact {
 	return parked.Fact{
-		EventID: eventID, Kind: parked.Shipped, OrderID: order, GroupNo: 1, TrackingNumbers: []string{"TRK1"},
+		EventID: eventID, Kind: parked.Shipped, OrderID: order, GroupNo: 1, TrackingNumbers: []string{firstTracking},
 		OccurredAt: at(m), ParkedAt: at(m),
 	}
 }

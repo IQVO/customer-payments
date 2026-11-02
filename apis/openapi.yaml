@@ -254,6 +254,12 @@ paths:
           $ref: '#/components/responses/Unprocessable'
         '500':
           $ref: '#/components/responses/InternalError'
+        '503':
+          description: payment-provider unreachable or timed out (payment-provider-unavailable), or manual refunds disabled by configuration (refunds-disabled, REFUNDS_ENABLED=false; no retry until an operator re-enables them).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
     get:
       tags: [Refunds]
       operationId: listRefunds
