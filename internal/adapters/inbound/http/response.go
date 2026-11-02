@@ -51,7 +51,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	p := problemFor(err)
 	detail := err.Error()
 	if p == internalProblem {
-		slog.ErrorContext(r.Context(), "request failed", "error", err, "method", r.Method, "path", r.URL.Path)
+		slog.ErrorContext(r.Context(), "request failed", "error", sanitizeLog(err.Error()), "method", sanitizeLog(r.Method), "path", sanitizeLog(r.URL.Path))
 		detail = "an unexpected error occurred"
 	}
 	writeBody(w, p.status, problemBody(r, p, detail))
