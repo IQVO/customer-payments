@@ -31,6 +31,9 @@ func ttlSeconds() float64 { return idempotency.TTL.Seconds() }
 // between the failed claim and the read (an expiry race).
 const claimAttempts = 3
 
+// httpClientError is the first status that is an error answer (a 4xx).
+const httpClientError = 400
+
 // httpServerError is the first status that is never stored (a 5xx).
 const httpServerError = 500
 
@@ -50,6 +53,38 @@ const storeSQL = `UPDATE idempotency_keys SET status = $2, content_type = $3, bo
 const readSQL = `
 	SELECT request_hash, status, content_type, body, created_at FROM idempotency_keys
 	WHERE route = '' AND key = $1 AND created_at > now() - make_interval(secs => $2)`
+
+const (
+	savepointSQL  = `SAVEPOINT handler_run`
+	releaseSQL    = `RELEASE SAVEPOINT handler_run`
+	rollbackToSQL = `ROLLBACK TO SAVEPOINT handler_run`
+)
+
+// settleSavepoint closes the savepoint the handler ran behind.
+//
+// A mapped domain conflict (a lost race on a unique index, 23505 -> 409) fails a
+// statement on the server and leaves the shared transaction ABORTED even though
+// the handler answers a truthful 4xx; recording that answer would then fail with
+// SQLSTATE 25P02 and the client would see a 500. Releasing the savepoint exposes
+// the abort: the release fails, ROLLBACK TO SAVEPOINT discards only the handler's
+// partial writes (the key claim made before the savepoint survives) and heals the
+// transaction, and the 4xx outcome is stored and committed like any other. A
+// success answer (< 400) behind a failed release is a lie, its writes are gone:
+// it is neither returned nor stored; the error rolls the transaction back (the
+// caller's defer) so the same key retries the real work.
+func settleSavepoint(ctx context.Context, tx pgx.Tx, status int) error {
+	_, relErr := tx.Exec(ctx, releaseSQL)
+	if relErr == nil {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, rollbackToSQL); err != nil {
+		return fmt.Errorf("heal idempotent request: %w", err)
+	}
+	if status < httpClientError {
+		return fmt.Errorf("idempotent request answered %d over an aborted transaction: %w", status, relErr)
+	}
+	return nil
+}
 
 // Do implements ports.IdempotencyStore: the claim, fn's writes (through the
 // transaction carried by the ctx it is handed, so every unit of work joins it)
@@ -83,11 +118,17 @@ func (s *IdempotencyStore) attempt(ctx context.Context, key, requestHash string,
 		_ = tx.Rollback(context.WithoutCancel(ctx))
 		return s.replay(ctx, key)
 	}
+	if _, err := tx.Exec(ctx, savepointSQL); err != nil {
+		return rec, false, false, fmt.Errorf("savepoint idempotent request: %w", err)
+	}
 	if rec, err = fn(pgtx.With(ctx, tx)); err != nil {
 		return idempotency.Record{}, false, false, err
 	}
 	if rec.Status >= httpServerError {
 		return rec, false, false, nil // rolled back by the defer: a 5xx is never stored
+	}
+	if err := settleSavepoint(ctx, tx, rec.Status); err != nil {
+		return idempotency.Record{}, false, false, err
 	}
 	body := rec.Body
 	if body == nil {
