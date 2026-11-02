@@ -42,6 +42,8 @@ func NewServer(deps Deps) *mcp.Server {
 		&mcp.ServerOptions{Instructions: instructions},
 	)
 	deps.registerTools(server)
+	deps.registerResources(server)
+	deps.registerPrompts(server)
 	return server
 }
 
