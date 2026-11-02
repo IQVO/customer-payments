@@ -5,60 +5,69 @@ import (
 	"testing"
 
 	"github.com/IQVO/customer-payments/internal/application/pagination"
+	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
+	"github.com/IQVO/customer-payments/internal/domain/refund"
 )
 
 // The paged reads (REST guideline 3.4): keyset order (created-at, id) ascending, strictly
 // after the keyset, at most limit rows. The fixtures share created-at instants on purpose,
 // so a page that cut on created-at alone would skip or repeat rows.
 
-// walkSessions pages through PageBySession with the given page size and returns the ids in
-// the order served.
-func walkSessions(t *testing.T, e Env, session string, size int) []string {
+// maxWalkPages bounds a pageWalker run: past it the walk is a bug, not a page.
+const maxWalkPages = 100
+
+// pageWalker pages through fetch with the given page size and returns the row
+// ids in the order served; idOf renders a row's id and keyOf its resume keyset.
+// It is the shared engine behind walkSessions and walkRefunds.
+func pageWalker[T any](t *testing.T, what string, size int,
+	fetch func(after *pagination.Keyset, limit int) ([]T, error),
+	idOf func(T) string, keyOf func(T) pagination.Keyset,
+) []string {
 	t.Helper()
 	var ids []string
 	var after *pagination.Keyset
 	for pages := 0; ; pages++ {
-		if pages > 100 {
+		if pages > maxWalkPages {
 			t.Fatal("the walk never ends")
 		}
-		rows, err := e.Authorizations.PageBySession(ctx(), session, after, size)
-		fatalIf(t, err, "page by session")
+		rows, err := fetch(after, size)
+		fatalIf(t, err, what)
 		if len(rows) > size {
 			t.Fatalf("page of %d rows, limit %d", len(rows), size)
 		}
-		for _, p := range rows {
-			ids = append(ids, string(p.ID()))
+		for _, row := range rows {
+			ids = append(ids, idOf(row))
 		}
 		if len(rows) < size {
 			return ids
 		}
-		last := rows[len(rows)-1]
-		after = &pagination.Keyset{CreatedAt: last.CreatedAt(), ID: string(last.ID())}
+		after = new(pagination.Keyset)
+		*after = keyOf(rows[len(rows)-1])
 	}
 }
 
+// walkSessions pages through PageBySession with the given page size and returns the ids in
+// the order served.
+func walkSessions(t *testing.T, e Env, session string, size int) []string {
+	return pageWalker(t, "page by session", size,
+		func(after *pagination.Keyset, limit int) ([]*paymentauthorization.PaymentAuthorization, error) {
+			return e.Authorizations.PageBySession(ctx(), session, after, limit)
+		},
+		func(p *paymentauthorization.PaymentAuthorization) string { return string(p.ID()) },
+		func(p *paymentauthorization.PaymentAuthorization) pagination.Keyset {
+			return pagination.Keyset{CreatedAt: p.CreatedAt(), ID: string(p.ID())}
+		})
+}
+
 func walkRefunds(t *testing.T, e Env, order string, size int) []string {
-	t.Helper()
-	var ids []string
-	var after *pagination.Keyset
-	for pages := 0; ; pages++ {
-		if pages > 100 {
-			t.Fatal("the walk never ends")
-		}
-		rows, err := e.Refunds.ListByOrder(ctx(), order, after, size)
-		fatalIf(t, err, "page refunds")
-		if len(rows) > size {
-			t.Fatalf("page of %d rows, limit %d", len(rows), size)
-		}
-		for _, f := range rows {
-			ids = append(ids, string(f.ID()))
-		}
-		if len(rows) < size {
-			return ids
-		}
-		last := rows[len(rows)-1]
-		after = &pagination.Keyset{CreatedAt: last.CreatedAt(), ID: string(last.ID())}
-	}
+	return pageWalker(t, "page refunds", size,
+		func(after *pagination.Keyset, limit int) ([]*refund.Refund, error) {
+			return e.Refunds.ListByOrder(ctx(), order, after, limit)
+		},
+		func(f *refund.Refund) string { return string(f.ID()) },
+		func(f *refund.Refund) pagination.Keyset {
+			return pagination.Keyset{CreatedAt: f.CreatedAt(), ID: string(f.ID())}
+		})
 }
 
 func sameIDs(t *testing.T, what string, got, want []string) {
@@ -76,7 +85,7 @@ func testPages(t *testing.T, e Env) {
 func sessionPages(t *testing.T, e Env) {
 	// Five declined attempts at t0 (a tie), a second tie at +3 min and the live one at +7 min.
 	// Declined attempts may repeat for one session; only one live authorization may exist.
-	for _, id := range []string{"pay-e", "pay-b", "pay-d", "pay-a", "pay-c"} {
+	for _, id := range []string{"pay-e", "pay-b", "pay-d", "pay-a", liveAuthID} {
 		fatalIf(t, e.Authorizations.Save(ctx(), declinedAuthAt(t, id, "cs-page", 0)), "save declined "+id)
 	}
 	for _, id := range []string{"pay-h", "pay-g", "pay-f"} {
@@ -85,7 +94,7 @@ func sessionPages(t *testing.T, e Env) {
 	savedAuth(t, e, "pay-z", "cs-page", 7)
 	savedAuth(t, e, "pay-other", "cs-other", 0)
 
-	want := []string{"pay-a", "pay-b", "pay-c", "pay-d", "pay-e", "pay-f", "pay-g", "pay-h", "pay-z"}
+	want := []string{"pay-a", "pay-b", liveAuthID, "pay-d", "pay-e", "pay-f", "pay-g", "pay-h", "pay-z"}
 	for _, size := range []int{1, 2, 3, 4, 9, 10, 500} {
 		sameIDs(t, fmt.Sprintf("page size %d", size), walkSessions(t, e, "cs-page", size), want)
 	}

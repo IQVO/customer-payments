@@ -145,12 +145,12 @@ func (c *Client) post(ctx context.Context, path, key string, body, out any) erro
 	req.Header.Set("Idempotency-Key", key)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %v", provider.ErrUnavailable, err)
+		return fmt.Errorf("%w: %w", provider.ErrUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return fmt.Errorf("%w: reading the answer: %v", provider.ErrUnavailable, err)
+		return fmt.Errorf("%w: reading the answer: %w", provider.ErrUnavailable, err)
 	}
 	return answer(resp.StatusCode, data, out)
 }
