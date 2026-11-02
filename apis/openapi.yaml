@@ -227,7 +227,7 @@ paths:
         '422':
           $ref: '#/components/responses/Unprocessable'
         '503':
-          description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key.
+          description: payment-provider unreachable or timed out (payment-provider-unavailable), or manual refunds disabled by configuration (refunds-disabled, REFUNDS_ENABLED=false; no retry until an operator re-enables them).
           content:
             application/problem+json:
               schema:

@@ -162,3 +162,22 @@ func TestMetricsExposeTheParkedFactsGauge(t *testing.T) {
 	e.reroute()
 	e.wantStatus(e.get("/metrics"), http.StatusInternalServerError)
 }
+
+// TestRefundsDisabledFlag covers the ops kill switch of POST /refunds
+// (portfolio rec 2026-11-02): while DisableRefunds is set the route answers
+// 503 refunds-disabled and creates nothing; the default (unset) route is
+// unchanged.
+func TestRefundsDisabledFlag(t *testing.T) {
+	e := newEnv(t)
+	e.shipped()
+	e.api.DisableRefunds = true
+	body := `{"orderId":"ord-1","amountMinor":100,"reason":"MANUAL"}`
+	e.wantProblem(e.post("/refunds", body), http.StatusServiceUnavailable, "refunds-disabled")
+	l := e.get("/refunds?orderId=ord-1")
+	e.wantStatus(l, http.StatusOK)
+	if got := l.json(t)["items"].([]any); len(got) != 0 {
+		t.Fatalf("a disabled route created refunds: %s", l.Body)
+	}
+	e.api.DisableRefunds = false
+	e.wantStatus(e.post("/refunds", body), http.StatusCreated)
+}

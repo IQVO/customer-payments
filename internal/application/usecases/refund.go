@@ -119,8 +119,31 @@ func (u RequestRefund) Execute(ctx context.Context, in RequestRefundInput) (view
 		if err != nil {
 			return views.Refund{}, err
 		}
+		u.auditManualRefund(ctx, f)
 		return views.RefundFrom(f), nil
 	})
+}
+
+// auditManualRefund writes the audit record of every refund created through
+// POST /refunds (portfolio rec: audit-log every manual refund). The route
+// carries no operator identity yet, so the actor is the system until the API
+// grows operator fields; who/what/when are everything the repo can know, and
+// the record rides the request's trace (trace_id, span_id) like every log
+// line of this context.
+func (d Deps) auditManualRefund(ctx context.Context, f *refund.Refund) {
+	d.logger().InfoContext(ctx, "AUDIT manual refund created",
+		"actor", "system",
+		"action", "manual-refund",
+		"refund_id", string(f.ID()),
+		"authorization_id", f.AuthorizationID(),
+		"order_id", f.OrderID(),
+		"group_no", f.GroupNo(),
+		"amount_minor", f.AmountMinor(),
+		"currency", f.Currency(),
+		"reason", string(f.Reason()),
+		"state", string(f.State()),
+		"created_at", f.CreatedAt().Format(time.RFC3339Nano),
+	)
 }
 
 // RetryRefund is the command RetryRefund (POST /refunds/{refundId}:retry, H8).

@@ -115,7 +115,7 @@ func run(ctx context.Context) error {
 	readiness := newReadiness(ad.pool.Ping, rt.brokers)
 	httpServer := &http.Server{
 		Addr:              getenv("HTTP_ADDR", ":8080"),
-		Handler:           inboundhttp.NewRouter(buildServer(ad, readiness), logger, tel.serviceName),
+		Handler:           inboundhttp.NewRouter(buildServer(ad, readiness, refundsEnabled(os.Getenv, logger)), logger, tel.serviceName),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -190,7 +190,7 @@ func buildAdapters(ctx context.Context, rt runtimeEnv, logger *slog.Logger) (ada
 
 }
 
-func buildServer(ad adapters, readiness *inboundhttp.Readiness) *inboundhttp.Server {
+func buildServer(ad adapters, readiness *inboundhttp.Readiness, refundsEnabled bool) *inboundhttp.Server {
 	d := ad.deps
 	return &inboundhttp.Server{
 		AuthorizePayment: usecases.AuthorizePayment{Deps: d}, VoidAuthorization: usecases.VoidAuthorization{Deps: d},
@@ -198,6 +198,7 @@ func buildServer(ad adapters, readiness *inboundhttp.Readiness) *inboundhttp.Ser
 		RequestRefund: usecases.RequestRefund{Deps: d}, RetryRefund: usecases.RetryRefund{Deps: d},
 		GetRefund: usecases.GetRefund{Deps: d}, ListRefunds: usecases.ListRefunds{Deps: d},
 		IdempotencyStore: ad.idempotency, Clock: ad.clock, Readiness: readiness, ParkedFacts: d.Parked.Count,
+		DisableRefunds: !refundsEnabled,
 	}
 }
 

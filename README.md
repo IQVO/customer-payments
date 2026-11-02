@@ -126,6 +126,7 @@ go run ./cmd/api        # migrations run at boot; REST on :8080, /readyz gates o
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Relay poll interval (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row (`0` = unlimited) |
 | `POLICY_INTERVAL` | `5s` | Clock-driven policy pass interval (re-authorization) |
+| `REFUNDS_ENABLED` | `true` | Ops kill switch of `POST /refunds`: `false`/`0` = the route answers 503 `refunds-disabled` |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait after flipping `/readyz` before closing |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `OTEL_SERVICE_NAME` | `customer-payments` | `service.name` of spans and metrics |
