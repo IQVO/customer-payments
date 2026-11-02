@@ -53,7 +53,7 @@ PSP tokens.
   Kafka events, never by REST writes; partial release shrinks the provider hold.
 - **Refund** lost or returned packages automatically, or on request
   (`POST /refunds`), with retry of failed refunds
-  (`POST /refunds/{refundId}:retry`) and an alert when the fifth attempt fails.
+  (`POST /refunds/{refundId}/retries`) and an alert when the fifth attempt fails.
 - **Re-authorize** before expiry; a provider decline expires the authorization
   and raises `PaymentDeclined` with reason `REAUTH_DECLINED`.
 - **Publish** every decision through a transactional outbox as CloudEvents 1.0.
@@ -79,3 +79,7 @@ This repository is part of the Storefront domain. It consumes the retail
 network's published `retailnetwork.*` events and calls no route of any sibling
 context: its only synchronous outbound call is to the payment provider. See
 [Integration](/docs/ecosystem/integration).
+
+:::note[Disclaimer]
+This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
+:::

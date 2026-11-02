@@ -6,10 +6,8 @@ info:
     name: customer-payments maintainers
     url: https://github.com/IQVO/customer-payments
   description: >-
-    Proposed REST contract of the customer-payments bounded context of the
-    digital storefront, derived from storefront/model/model.yaml
-    (contexts[customer-payments].rest). Nothing is built yet. Customer
-    Payments moves money with the shipment facts: authorize at checkout,
+    REST contract of the customer-payments bounded context of the digital
+    storefront, as the service serves it. Customer Payments moves money with the shipment facts: authorize at checkout,
     capture each shipment group's allocation when it ships
     (FulfillmentShipped), release on cancellation (FulfillmentCancelled),
     refund on lost or returned packages (PackageLost, PackageReturned), and
@@ -24,7 +22,18 @@ info:
     (application/problem+json) whose type is /problems/<slug>; shared types
     are not-found (404), illegal-transition (409), concurrent-update (409)
     and validation-failed (422), plus one kebab-case slug per Err of the
-    model. Every write takes an Idempotency-Key header. No authentication.
+    model, and the idempotency problems idempotency-key-required and
+    idempotency-key-invalid (400) and idempotency-key-reused (409). Every
+    write (each POST) takes an Idempotency-Key header: a retry with the same
+    key and the same request (method, path, body) replays the first answer
+    (Idempotency-Replayed: true; any answer below 500 is stored for 24 hours,
+    a 5xx is never stored), the same key with another request is 409
+    idempotency-key-reused. A body that is not one JSON object of the declared
+    fields (unknown field, trailing data, over 64 KiB, a NUL character) is 400
+    malformed-request; a NUL character in a path is 404 resource-not-found.
+    Any operation can answer 500
+    internal-error. The two collection reads are keyset-paged ({items, nextCursor}; invalid-limit,
+    invalid-cursor and unknown-query-parameter are 400). No authentication.
 servers:
   - url: http://localhost:8080
 tags:
@@ -41,11 +50,13 @@ paths:
       description: >-
         AuthorizePayment. One authorization per checkout session
         (ErrDuplicateAuthorization; a replay with the same Idempotency-Key
-        returns the existing one). checkout calls this with key
-        <sessionId>:auth and one allocation per shipment group; allocations
-        must sum to the authorized total and name the session's groups
-        (ErrAllocationMismatch). On a provider decline the record is DECLINED
-        (terminal) and the checkout session stays open for another token.
+        returns the existing one; so does a new key while the session holds a
+        live authorization, answered 200 instead of 201). checkout calls this
+        with key <sessionId>:auth and one allocation per shipment group
+        (1 to 50, distinct groupNo); allocations must sum to the authorized
+        total (ErrAllocationMismatch). On a provider decline the record is
+        DECLINED (terminal, 201 with declineReason) and the checkout session
+        stays open for another token.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -55,26 +66,42 @@ paths:
             schema:
               $ref: '#/components/schemas/AuthorizeRequest'
       responses:
-        '201':
-          description: The authorization (AUTHORIZED or DECLINED).
+        '200':
+          description: The live authorization the checkout session already holds (no new authorization was created).
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentAuthorization'
+        '201':
+          description: The authorization this call created (AUTHORIZED or DECLINED).
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAuthorization'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
         '409':
-          description: duplicate-authorization (ErrDuplicateAuthorization) or concurrent-update.
+          description: duplicate-authorization (ErrDuplicateAuthorization), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: validation-failed or allocation-mismatch (ErrAllocationMismatch).
+          description: validation-failed, negative-amount or allocation-mismatch (ErrAllocationMismatch, also a groupNo that appears twice).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalError'
         '503':
-          description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key; provider keys are deterministic.
+          description: payment-provider unreachable or timed out (payment-provider-unavailable). Nothing is stored; retry with the same Idempotency-Key, provider keys are deterministic.
           content:
             application/problem+json:
               schema:
@@ -83,7 +110,11 @@ paths:
       tags: [Authorizations]
       operationId: listPaymentAuthorizations
       summary: List authorizations by order or checkout session
-      description: ListAuthorizations. Exactly one of orderId or checkoutSessionId is required.
+      description: >-
+        ListAuthorizations. Exactly one of orderId or checkoutSessionId is
+        required (none or both is 422 validation-failed). Keyset-paged, oldest first (createdAt, authorizationId):
+        follow nextCursor until it is absent and repeat the filter on every
+        page request.
       parameters:
         - name: orderId
           in: query
@@ -95,15 +126,21 @@ paths:
           required: false
           schema:
             type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
-          description: The matching authorizations.
+          description: One page of the matching authorizations.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaymentAuthorizationList'
+                $ref: '#/components/schemas/PaymentAuthorizationPage'
+        '400':
+          $ref: '#/components/responses/InvalidPageRequest'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /payment-authorizations/{authorizationId}:
     get:
       tags: [Authorizations]
@@ -121,7 +158,9 @@ paths:
                 $ref: '#/components/schemas/PaymentAuthorization'
         '404':
           $ref: '#/components/responses/NotFound'
-  /payment-authorizations/{authorizationId}:void:
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /payment-authorizations/{authorizationId}/voids:
     post:
       tags: [Authorizations]
       operationId: voidPaymentAuthorization
@@ -138,18 +177,31 @@ paths:
       responses:
         '200':
           description: The voided authorization.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentAuthorization'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: illegal-transition (already captured, voided or expired) or concurrent-update.
+          description: illegal-transition (already captured, voided or expired), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+        '422':
+          description: payment-declined (the provider refused the void).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalError'
         '503':
           description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key.
           content:
@@ -163,8 +215,13 @@ paths:
       summary: Request a manual refund (ops only)
       description: >-
         RequestRefund, the ops route. Automatic refunds come from the
-        RefundOnLostPackage and RefundOnReturnToSender policies. Refunds of an
-        order never exceed its captured total (ErrOverRefund).
+        RefundOnLostPackage and RefundOnReturnToSender policies. The order must
+        have an authorization (else 404). groupNo is optional: absent or 0
+        refunds at the order level. Refunds of an order (and of a group) never
+        exceed the captured total (ErrOverRefund); FAILED refunds do not count.
+        The provider is tried once in the same call: the answer is 201 with the
+        refund SUCCEEDED, FAILED (provider decline, failureCode set) or still
+        REQUESTED (provider unreachable; a policy retries it), never 503.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -175,52 +232,125 @@ paths:
               $ref: '#/components/schemas/RefundRequest'
       responses:
         '201':
-          description: The requested refund (REQUESTED).
+          description: The requested refund (REQUESTED, SUCCEEDED or FAILED after the one provider attempt).
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Refund'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
-          description: over-refund (ErrOverRefund) or concurrent-update.
+          description: over-refund (ErrOverRefund), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
           $ref: '#/components/responses/Unprocessable'
-        '503':
-          description: payment-provider unreachable or timed out (payment-provider-unavailable). Retry with the same Idempotency-Key.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalError'
     get:
       tags: [Refunds]
       operationId: listRefunds
       summary: List refunds of an order
-      description: ListRefunds.
+      description: >-
+        ListRefunds. Keyset-paged, oldest first (createdAt, refundId): follow
+        nextCursor until it is absent and repeat orderId on every page request.
       parameters:
         - name: orderId
           in: query
           required: true
           schema:
             type: string
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
-          description: The matching refunds.
+          description: One page of the matching refunds.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RefundList'
+                $ref: '#/components/schemas/RefundPage'
+        '400':
+          $ref: '#/components/responses/InvalidPageRequest'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /refunds/{refundId}:
+    get:
+      tags: [Refunds]
+      operationId: getRefund
+      summary: Get one refund
+      description: GetRefund.
+      parameters:
+        - $ref: '#/components/parameters/RefundId'
+      responses:
+        '200':
+          description: The refund.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /refunds/{refundId}/retries:
+    post:
+      tags: [Refunds]
+      operationId: retryRefund
+      summary: Retry a failed refund (ops only)
+      description: >-
+        RetryRefund, the ops route; no request body. Moves a FAILED refund back
+        to REQUESTED and tries the provider once more, at most 5 attempts in
+        all. The answer is 200 with the Refund as it stands after that attempt
+        (SUCCEEDED, FAILED again with failureCode, or still REQUESTED when the
+        provider is unreachable); it is never 503. A refund that is not FAILED,
+        or whose attempts are used up, is 409 illegal-transition.
+      parameters:
+        - $ref: '#/components/parameters/RefundId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The refund after the retry attempt.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: illegal-transition (the refund is not FAILED, or its 5 attempts are used), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   parameters:
     IdempotencyKey:
       name: Idempotency-Key
       in: header
       required: true
-      description: A repeated key returns the stored response of the first call.
+      description: >-
+        Client-generated UUID per logical submit (1 to 128 printable ASCII
+        characters); a retry reuses it. The same key with the same request
+        (method, path, body) replays the stored answer with
+        Idempotency-Replayed: true; the same key with another request is 409
+        idempotency-key-reused. Missing is 400 idempotency-key-required, not
+        1 to 128 printable ASCII characters is 400 idempotency-key-invalid.
       schema:
         type: string
         minLength: 1
@@ -231,15 +361,62 @@ components:
       required: true
       schema:
         type: string
+    RefundId:
+      name: refundId
+      in: path
+      required: true
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size, 1 to 500 (default 100). Anything else (empty, repeated, not an integer) is 400 invalid-limit.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque token copied from the previous page's nextCursor; absent (or empty) on the first page. One that does not decode, or is repeated, is 400 invalid-cursor.
+      schema:
+        type: string
+  headers:
+    IdempotencyReplayed:
+      description: '"true" when the answer is the stored response of an earlier request with the same Idempotency-Key; absent on the first execution.'
+      schema:
+        type: string
+        enum: ['true']
   responses:
     NotFound:
-      description: not-found.
+      description: not-found (no such resource, or an identifier longer than 128 characters); resource-not-found for a path that carries a NUL character.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: internal-error (an unexpected failure; the detail never carries the internal message).
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
       description: validation-failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyKeyProblem:
+      description: idempotency-key-required (no Idempotency-Key header), idempotency-key-invalid (not 1 to 128 printable ASCII characters) or malformed-request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InvalidPageRequest:
+      description: invalid-limit (limit is not an integer from 1 to 500), invalid-cursor (cursor does not decode), unknown-query-parameter (a query parameter the collection does not declare, for example the retired after, offset or nextToken) or malformed-request.
       content:
         application/problem+json:
           schema:
@@ -267,18 +444,29 @@ components:
           format: uri-reference
     Allocation:
       type: object
-      required: [groupNo, amountMinor, state]
+      required: [groupNo, amountMinor, state, trackingNumber, trackingNumbers]
       properties:
         groupNo:
           type: integer
           minimum: 1
+          maximum: 2147483647
         amountMinor:
           type: integer
           format: int64
           minimum: 0
+          maximum: 1000000000
         state:
           type: string
           enum: [PENDING, CAPTURED, RELEASED]
+        trackingNumber:
+          type: string
+          nullable: true
+          description: Tracking number set at capture; null until then.
+        trackingNumbers:
+          type: array
+          description: Tracking numbers of the group's packages; empty until captured.
+          items:
+            type: string
     AllocationInput:
       type: object
       required: [groupNo, amountMinor]
@@ -286,18 +474,25 @@ components:
         groupNo:
           type: integer
           minimum: 1
+          maximum: 2147483647
         amountMinor:
           type: integer
           format: int64
           minimum: 0
+          maximum: 1000000000
     AuthorizeRequest:
       type: object
       required: [checkoutSessionId, paymentMethodToken, currency, totalMinor, allocations]
       properties:
         checkoutSessionId:
           type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
         paymentMethodToken:
           type: string
+          minLength: 1
+          maxLength: 256
           description: The PSP token; never a card number.
         currency:
           type: string
@@ -306,14 +501,16 @@ components:
           type: integer
           format: int64
           minimum: 0
+          maximum: 1000000000
         allocations:
           type: array
           minItems: 1
+          maxItems: 50
           items:
             $ref: '#/components/schemas/AllocationInput'
     PaymentAuthorization:
       type: object
-      required: [authorizationId, checkoutSessionId, state, currency, totalMinor, allocations]
+      required: [authorizationId, checkoutSessionId, orderId, state, currency, totalMinor, allocations, providerAuthorizationId]
       properties:
         authorizationId:
           type: string
@@ -325,7 +522,7 @@ components:
           description: Bound on CheckoutCompleted (BindOrderOnCheckoutCompleted).
         state:
           type: string
-          enum: [AUTHORIZED, PARTIALLY_CAPTURED, CAPTURED, VOIDED, EXPIRED, DECLINED]
+          enum: [AUTHORIZED, PARTIALLY_CAPTURED, CAPTURED, RELEASED, VOIDED, EXPIRED, DECLINED]
         currency:
           type: string
           pattern: '^[A-Z]{3}$'
@@ -340,38 +537,63 @@ components:
         providerAuthorizationId:
           type: string
           nullable: true
+          description: Null on a DECLINED authorization.
         expiresAt:
           type: string
           format: date-time
-    PaymentAuthorizationList:
+          description: Absent when the authorization has no expiry (DECLINED).
+        declineReason:
+          type: string
+          description: The provider's decline code; present only on a DECLINED authorization.
+    PaymentAuthorizationPage:
       type: object
-      required: [authorizations]
+      description: One page of authorizations. nextCursor is absent on the last page.
+      required: [items]
       properties:
-        authorizations:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/PaymentAuthorization'
+        nextCursor:
+          type: string
+          description: Opaque cursor of the next page; pass it back as the cursor query parameter.
     RefundRequest:
       type: object
       required: [orderId, amountMinor, reason]
       properties:
         orderId:
           type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+        groupNo:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+          description: Shipment group to refund; absent or 0 refunds at the order level.
         amountMinor:
           type: integer
           format: int64
           minimum: 1
+          maximum: 1000000000
         reason:
           type: string
           enum: [LOST, RETURNED_TO_SENDER, MANUAL]
     Refund:
       type: object
-      required: [refundId, orderId, amountMinor, reason, state]
+      required: [refundId, authorizationId, orderId, amountMinor, reason, state, attempts]
       properties:
         refundId:
           type: string
+        authorizationId:
+          type: string
+          description: The authorization the money returns through.
         orderId:
           type: string
+        groupNo:
+          type: integer
+          minimum: 1
+          description: Absent for an order-level refund.
         amountMinor:
           type: integer
           format: int64
@@ -382,11 +604,26 @@ components:
         state:
           type: string
           enum: [REQUESTED, SUCCEEDED, FAILED]
-    RefundList:
+        attempts:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: Provider attempts so far (a FAILED refund is retried up to 5).
+        failureCode:
+          type: string
+          description: The provider's failure code; present on a FAILED refund.
+        providerRefundId:
+          type: string
+          description: The provider's refund id; present on a SUCCEEDED refund.
+    RefundPage:
       type: object
-      required: [refunds]
+      description: One page of refunds. nextCursor is absent on the last page.
+      required: [items]
       properties:
-        refunds:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/Refund'
+        nextCursor:
+          type: string
+          description: Opaque cursor of the next page; pass it back as the cursor query parameter.

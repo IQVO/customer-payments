@@ -111,17 +111,17 @@ func TestListAuthorizations(t *testing.T) {
 	e := newEnv(t)
 	id := e.bound()
 	l := usecases.ListAuthorizations{Deps: e.deps}
-	if got, err := l.Execute(context.Background(), "ord-1", ""); err != nil || len(got) != 1 || got[0].AuthorizationID != id {
+	if got, err := l.Execute(context.Background(), "ord-1", "", nil, 100); err != nil || len(got.Items) != 1 || got.Items[0].AuthorizationID != id || got.Next != nil {
 		t.Errorf("by order = %+v %v", got, err)
 	}
-	if got, err := l.Execute(context.Background(), "", "cs-1"); err != nil || len(got) != 1 {
+	if got, err := l.Execute(context.Background(), "", "cs-1", nil, 100); err != nil || len(got.Items) != 1 {
 		t.Errorf("by session = %+v %v", got, err)
 	}
-	if got, err := l.Execute(context.Background(), "ord-9", ""); err != nil || len(got) != 0 {
+	if got, err := l.Execute(context.Background(), "ord-9", "", nil, 100); err != nil || len(got.Items) != 0 {
 		t.Errorf("unknown order = %+v %v", got, err)
 	}
 	for _, args := range [][2]string{{"", ""}, {"a", "b"}} {
-		_, err := l.Execute(context.Background(), args[0], args[1])
+		_, err := l.Execute(context.Background(), args[0], args[1], nil, 100)
 		wantErr(t, err, shared.ErrValidation)
 	}
 }

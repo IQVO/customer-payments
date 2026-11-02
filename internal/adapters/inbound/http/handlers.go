@@ -66,13 +66,18 @@ func (s *Server) handleGetAuthorization(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleListAuthorizations(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	list, err := s.ListAuthorizations.Execute(r.Context(), q.Get("orderId"), q.Get("checkoutSessionId"))
+	limit, after, err := pageParams(r, "orderId", "checkoutSessionId")
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, authorizationListFrom(list))
+	q := r.URL.Query()
+	res, err := s.ListAuthorizations.Execute(r.Context(), q.Get("orderId"), q.Get("checkoutSessionId"), after, limit)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, authorizationPageOut(res.Items, res.Next))
 }
 
 func (s *Server) handleVoid(w http.ResponseWriter, r *http.Request) {
@@ -103,12 +108,17 @@ func (s *Server) handleRequestRefund(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListRefunds(w http.ResponseWriter, r *http.Request) {
-	list, err := s.ListRefunds.Execute(r.Context(), r.URL.Query().Get("orderId"))
+	limit, after, err := pageParams(r, "orderId")
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, refundListFrom(list))
+	res, err := s.ListRefunds.Execute(r.Context(), r.URL.Query().Get("orderId"), after, limit)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, refundPageOut(res.Items, res.Next))
 }
 
 func (s *Server) handleGetRefund(w http.ResponseWriter, r *http.Request) {

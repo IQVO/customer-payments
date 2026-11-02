@@ -27,10 +27,13 @@ sequenceDiagram
     participant P as paymentprovider
     participant DB as Postgres
     C->>H: POST /payment-authorizations<br/>Idempotency-Key
-    H->>I: look up (route, key)
+    H->>I: Do(key, method + path + body hash)
     alt stored answer for the same request
         I-->>H: stored response
-        H-->>C: same status + Idempotent-Replayed true
+        H-->>C: same status + Idempotency-Replayed true
+    else stored answer of another request
+        I-->>H: stored response
+        H-->>C: 409 idempotency-key-reused
     else new key
         H->>U: Execute(input)
         U->>DB: FindLiveBySession

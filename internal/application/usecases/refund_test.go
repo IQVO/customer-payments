@@ -121,7 +121,9 @@ func TestRetrySucceedsAfterTheProviderRecovers(t *testing.T) {
 	wantErr(t, err, ports.ErrNotFound)
 	_, err = usecases.RetryRefund{Deps: e.deps}.Execute(context.Background(), "nope")
 	wantErr(t, err, ports.ErrNotFound)
-	_, err = usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "")
+	_, err = usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "", nil, 100)
+	wantErr(t, err, shared.ErrValidation)
+	_, err = usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1", nil, 0)
 	wantErr(t, err, shared.ErrValidation)
 }
 
@@ -158,7 +160,8 @@ func TestPackageLostRefundsTheGroupOnce(t *testing.T) {
 	if err := e.fact("evt-r1", returned); err != nil {
 		t.Fatal(err)
 	}
-	list, _ := usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1")
+	page, _ := usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1", nil, 100)
+	list := page.Items
 	if len(list) != 1 || list[0].AmountMinor != 3000 || list[0].GroupNo != 2 || list[0].Reason != "LOST" {
 		t.Fatalf("refunds = %+v", list)
 	}
@@ -171,7 +174,8 @@ func TestPackageReturnedRefundsWithItsReason(t *testing.T) {
 	if err := e.fact("evt-r1", returned); err != nil {
 		t.Fatal(err)
 	}
-	list, _ := usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1")
+	page, _ := usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1", nil, 100)
+	list := page.Items
 	if len(list) != 1 || list[0].Reason != "RETURNED_TO_SENDER" || list[0].AmountMinor != 7000 {
 		t.Fatalf("refunds = %+v", list)
 	}

@@ -18,11 +18,11 @@ The context map is on [Context map](/docs/ddd/context-map).
 
 | Neighbour | Direction | Protocol | Contract | Failure behaviour |
 | --- | --- | --- | --- | --- |
-| `checkout` | calls us | REST (through Kong `/api/customer-payments` or in-cluster Service port 80) | `POST /payment-authorizations`, `POST /payment-authorizations/{authorizationId}:void`, `GET /payment-authorizations/{authorizationId}` in `apis/openapi.yaml` | `503 payment-provider-unavailable`: retry with the same `Idempotency-Key`; replays return the stored answer |
+| `checkout` | calls us | REST (through Kong `/api/customer-payments` or in-cluster Service port 80) | `POST /payment-authorizations`, `POST /payment-authorizations/{authorizationId}/voids`, `GET /payment-authorizations/{authorizationId}` in `apis/openapi.yaml` | `503 payment-provider-unavailable`: retry with the same `Idempotency-Key`; replays return the stored answer with `Idempotency-Replayed: true`; the same key with another request is `409 idempotency-key-reused` |
 | `checkout` | we consume | Kafka `retailnetwork.checkout.events` | `CheckoutCompleted` | transient failure: retry then `<topic>.dlq`; invalid event: dead-letter at once |
 | `order-sourcing` | we consume | Kafka `retailnetwork.order-sourcing.events` | `FulfillmentShipped`, `FulfillmentCancelled`, `FulfillmentUnsourceable` | as above; unbound order: parked |
 | `shipping-and-tracking` | we consume | Kafka `retailnetwork.shipping-and-tracking.events` | `PackageLost`, `PackageReturned` | as above; unknown tracking number: parked |
-| payment provider | we call | HTTP/JSON at `PAYMENT_PROVIDER_URL` | `POST /authorizations`, then `POST /authorizations/{id}/void`, `/captures`, `/refunds`, `/reauthorize`, `/reduce` (ADR 0002, assumption A12) | 10 s timeout; 402 = decline, 429 and 5xx = unavailable; deterministic idempotency key on every call |
+| payment provider | we call | HTTP/JSON at `PAYMENT_PROVIDER_URL` | `POST /authorizations`, then `POST /authorizations/{id}/voids`, `/captures`, `/refunds`, `/reauthorizations`, `/reductions` (ADR 0002, assumption A12; the noun routes of the payment-provider-simulator since the REST guideline cutover) | 10 s timeout; 402 = decline, 429 and 5xx = unavailable; deterministic idempotency key on every call |
 | Storefront ops (humans, agents) | call us | REST, MCP, A2A | [API overview](/docs/api-reference) | n/a |
 | analytics / other consumers | read our events | Kafka `retailnetwork.customer-payments.events` | [Events](/docs/api-reference/events) | at-least-once, dedupe on the CloudEvents `id` |
 

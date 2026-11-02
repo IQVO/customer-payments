@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/IQVO/customer-payments/internal/application/idempotency"
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/parked"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
 	"github.com/IQVO/customer-payments/internal/domain/refund"
@@ -34,6 +35,11 @@ type AuthorizationRepository interface {
 	// ListBySession returns every authorization of the session, oldest first
 	// (declined attempts included).
 	ListBySession(ctx context.Context, sessionID string) ([]*paymentauthorization.PaymentAuthorization, error)
+	// PageBySession returns up to limit authorizations of the session (declined
+	// attempts included) ordered by (created-at, id) ascending. A non-nil after
+	// resumes strictly after that keyset, so authorizations sharing a created-at
+	// are never skipped or repeated.
+	PageBySession(ctx context.Context, sessionID string, after *pagination.Keyset, limit int) ([]*paymentauthorization.PaymentAuthorization, error)
 	// FindByOrder returns the authorization bound to the order, or ErrNotFound.
 	FindByOrder(ctx context.Context, orderID string) (*paymentauthorization.PaymentAuthorization, error)
 	// FindByTracking returns the authorization one of whose allocations
@@ -57,8 +63,10 @@ type RefundRepository interface {
 	// Save persists the refund under the concurrency rule of the package
 	// comment.
 	Save(ctx context.Context, r *refund.Refund) error
-	// ListByOrder returns the refunds of the order, oldest first.
-	ListByOrder(ctx context.Context, orderID string) ([]*refund.Refund, error)
+	// ListByOrder returns up to limit refunds of the order ordered by
+	// (created-at, id) ascending. A non-nil after resumes strictly after that
+	// keyset, so refunds sharing a created-at are never skipped or repeated.
+	ListByOrder(ctx context.Context, orderID string, after *pagination.Keyset, limit int) ([]*refund.Refund, error)
 	// ListByAuthorization returns the refunds made through the authorization,
 	// oldest first.
 	ListByAuthorization(ctx context.Context, id paymentauthorization.ID) ([]*refund.Refund, error)
@@ -110,13 +118,23 @@ type UnitOfWork interface {
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// IdempotencyStore remembers the first response per (route, key) for 24 hours.
+// IdempotencyStore remembers the first answer per Idempotency-Key for 24 hours and
+// serialises the requests that share a key (REST guideline 2.3 and 2.5). The key is
+// global: the same key on another route is a different fingerprint (a reuse).
 type IdempotencyStore interface {
-	// Get returns the stored record, or ErrNotFound (expired records are
-	// treated as absent).
-	Get(ctx context.Context, route, key string) (idempotency.Record, error)
-	// Put stores the record unless one exists; it reports whether it stored.
-	Put(ctx context.Context, route, key string, rec idempotency.Record) (bool, error)
+	// Do runs fn at most once for a live key.
+	//
+	// A live record is returned with replayed true and fn does not run; the
+	// caller compares the record's RequestHash with its own. Otherwise Do claims
+	// the key and runs fn with a ctx that carries the unit of work: everything fn
+	// writes through the repositories, the outbox included, commits atomically
+	// with the record fn returns, stamped with at. A record with a status below
+	// 500 is stored (a 4xx too, so a retry is deterministic). A 5xx record, an
+	// error or a panic rolls everything back and stores nothing, so the retry
+	// runs fn again. A concurrent Do for the same key waits for the claimant,
+	// then replays its answer (or runs fn itself when nothing was stored).
+	Do(ctx context.Context, key, requestHash string, at time.Time,
+		fn func(ctx context.Context) (idempotency.Record, error)) (rec idempotency.Record, replayed bool, err error)
 }
 
 // Clock is the service's notion of "now"; use cases stamp aggregates with it.

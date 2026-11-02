@@ -26,9 +26,9 @@ annotations `readOnlyHint: true`, `idempotentHint: true`, `openWorldHint: false`
 | Tool | Input | Annotation | Returns |
 | --- | --- | --- | --- |
 | `get_payment_authorization` | `authorizationId` (string, **required**, e.g. `pay-3f9c1a2b4d5e`) | read-only | one authorization: `authorizationId`, `checkoutSessionId`, `orderId`, `state`, `currency`, `totalMinor`, `allocations[]` (`groupNo`, `amountMinor`, `state`, `trackingNumbers`), `expiresAt`, `declineReason`. An unknown id fails with `not-found`. |
-| `list_payment_authorizations` | `orderId` (string, optional), `checkoutSessionId` (string, optional); give **exactly one** | read-only | `{authorizations: [...]}` of the same shape; a session lists declined attempts too; an order or session with none yields an empty list |
+| `list_payment_authorizations` | `orderId` (string, optional), `checkoutSessionId` (string, optional); give **exactly one** | read-only | `{authorizations: [...]}` of the same shape, oldest first; a session lists declined attempts too; an order or session with none yields an empty list. The tool follows every page of the REST list for you, up to 1000 rows |
 | `get_refund` | `refundId` (string, **required**, e.g. `ref-3f9c1a2b4d5e`) | read-only | one refund: `refundId`, `authorizationId`, `orderId`, `groupNo`, `amountMinor`, `reason` (`LOST`, `RETURNED_TO_SENDER`, `MANUAL`), `state` (`REQUESTED`, `SUCCEEDED`, `FAILED`), `attempts`, `failureCode`. An unknown id fails with `not-found`. |
-| `list_refunds` | `orderId` (string, **required**) | read-only | `{refunds: [...]}`, oldest first |
+| `list_refunds` | `orderId` (string, **required**) | read-only | `{refunds: [...]}`, oldest first; the tool follows every page of the REST list for you, up to 1000 rows |
 
 Authorization states: `AUTHORIZED`, `PARTIALLY_CAPTURED`, `CAPTURED`, `RELEASED`,
 `VOIDED`, `EXPIRED`, `DECLINED`; allocation states: `PENDING`, `CAPTURED`,

@@ -81,9 +81,9 @@ bound.
 | Collaborator | Message | Type | Channel | Relationship |
 | --- | --- | --- | --- | --- |
 | checkout | `AuthorizePayment` | command | REST `POST /payment-authorizations` | Customer/Supplier (we supply) |
-| checkout | `VoidAuthorization` | command | REST `POST /payment-authorizations/{authorizationId}:void` | Customer/Supplier |
+| checkout | `VoidAuthorization` | command | REST `POST /payment-authorizations/{authorizationId}/voids` | Customer/Supplier |
 | checkout, ops | `GetAuthorization`, `ListAuthorizations` | query | REST `GET /payment-authorizations...` | Customer/Supplier, UI |
-| ops | `RequestRefund`, `RetryRefund` | command | REST `POST /refunds`, `POST /refunds/{refundId}:retry` | UI |
+| ops | `RequestRefund`, `RetryRefund` | command | REST `POST /refunds`, `POST /refunds/{refundId}/retries` | UI |
 | ops | `GetRefund`, `ListRefunds` | query | REST `GET /refunds...` | UI |
 | agents | four MCP tools, two A2A skills | query | `cmd/mcp`, `cmd/a2a` | UI |
 | checkout | `CheckoutCompleted` | event | Kafka `retailnetwork.checkout.events`, `com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted` | Customer/Supplier (we consume) |
@@ -150,4 +150,4 @@ not **Void**), **Refund**, **Reauthorization**, **Payment Method Token**.
 - **No alert rules.** `warehouse-infra` has a dashboard for this context but no alert
   group ([Observability](/docs/operations/observability#dashboards-and-alerts)).
 - **Spec drift.** The OpenAPI document lacks `RELEASED`, two refund routes and the
-  `200` replay of a live authorization ([API overview](/docs/api-reference#spec-versus-code)).
+  `200` replay of a live authorization is documented since the REST guideline cutover ([API overview](/docs/api-reference#spec-versus-code)).

@@ -42,7 +42,7 @@ func TestOutboxAppendStoresTheActiveTraceparent(t *testing.T) {
 	repo := postgres.NewOutboxRepo(pool, traceStubEncoder{n: new(int)})
 	event := paymentauthorization.PaymentCaptured{}
 
-	ctx, span := sdktrace.NewTracerProvider().Tracer("test").Start(context.Background(), "POST /payment-authorizations/{authorizationId}:void")
+	ctx, span := sdktrace.NewTracerProvider().Tracer("test").Start(context.Background(), "POST /payment-authorizations/{authorizationId}/voids")
 	defer span.End()
 	if err := repo.Append(ctx, event); err != nil {
 		t.Fatal(err)

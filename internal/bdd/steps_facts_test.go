@@ -48,16 +48,16 @@ func (w *world) wantRefund(amount int, reason, state string) error {
 		return err
 	}
 	var list struct {
-		Refunds []struct {
+		Items []struct {
 			AmountMinor int    `json:"amountMinor"`
 			Reason      string `json:"reason"`
 			State       string `json:"state"`
-		} `json:"refunds"`
+		} `json:"items"`
 	}
 	if err := json.Unmarshal([]byte(w.body), &list); err != nil {
 		return err
 	}
-	for _, r := range list.Refunds {
+	for _, r := range list.Items {
 		if r.AmountMinor == amount && r.Reason == reason && r.State == state {
 			return nil
 		}

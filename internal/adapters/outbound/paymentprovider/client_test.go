@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -67,7 +68,7 @@ func TestCaptureRefundVoidReduceReauthorize(t *testing.T) {
 	if err := c.Void(ctx, "v1", hold.ID); err != nil {
 		t.Fatalf("void: %v", err)
 	}
-	for _, op := range []string{"authorize", "captures", "refunds", "reduce", "reauthorize", "void"} {
+	for _, op := range []string{"authorize", "captures", "refunds", "reductions", "reauthorizations", "voids"} {
 		if f.Effects(op) != 1 {
 			t.Errorf("effects(%s) = %d", op, f.Effects(op))
 		}
@@ -141,5 +142,44 @@ func TestNewRejectsBadURLs(t *testing.T) {
 	}
 	if !strings.Contains(providerfake.DeclineToken, "declined") {
 		t.Fatal("fixture drifted")
+	}
+}
+
+// The wire paths are the fleet nouns of the payment-provider-simulator (REST guideline 1):
+// no verb segments, and every call is a POST carrying its Idempotency-Key.
+func TestWirePathsAreTheGuidelineNouns(t *testing.T) {
+	var (
+		mu   sync.Mutex
+		seen []string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		seen = append(seen, r.Method+" "+r.URL.Path+" key="+r.Header.Get("Idempotency-Key"))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"x","expiresAt":"2026-11-08T00:00:00Z"}`))
+	}))
+	defer srv.Close()
+	c, err := paymentprovider.New(srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	_, _ = c.Authorize(ctx, authReq("k-a", "tok_visa"))
+	_, _ = c.Capture(ctx, "k-c", "h-1", 1)
+	_, _ = c.Refund(ctx, "k-r", "h-1", 1)
+	_ = c.Void(ctx, "k-v", "h-1")
+	_, _ = c.Reauthorize(ctx, "k-re", "h-1", 1)
+	_ = c.ReduceAuthorization(ctx, "k-d", "h-1", 1)
+	want := []string{
+		"POST /authorizations key=k-a",
+		"POST /authorizations/h-1/captures key=k-c",
+		"POST /authorizations/h-1/refunds key=k-r",
+		"POST /authorizations/h-1/voids key=k-v",
+		"POST /authorizations/h-1/reauthorizations key=k-re",
+		"POST /authorizations/h-1/reductions key=k-d",
+	}
+	if strings.Join(seen, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("wire calls:\n%s\nwant:\n%s", strings.Join(seen, "\n"), strings.Join(want, "\n"))
 	}
 }
