@@ -243,7 +243,7 @@ CloudEvents shape:
 
 It also generates the packaging a first release needs:
 `Dockerfile` and `.dockerignore` (from `templates/packaging/`, build every
-`cmd/*`) and `docs/before-first-release.md`, a checklist that names each
+`cmd/*`) and `docs/docs/operations/before-first-release.md`, a checklist that names each
 packaging item (Helm chart named after the repo, chart tests, `DATABASE_URL`
 from a Secret, pod hardening, shutdown grace period, consumer-group values,
 repository secrets) and the sensor or CI job that guards it. The chart itself is
