@@ -33,6 +33,7 @@ func testUnitOfWork(t *testing.T, e Env) {
 	t.Run("a unit that fails rolls back every table", func(t *testing.T) { uowRollsBack(t, e) })
 	t.Run("a unit that succeeds commits everything", func(t *testing.T) { uowCommits(t, e) })
 	t.Run("a nested unit joins the outer one", func(t *testing.T) { uowNests(t, e) })
+	t.Run("a nested unit that fails undoes only itself", func(t *testing.T) { uowNestedFailure(t, e) })
 }
 
 func uowRollsBack(t *testing.T, e Env) {
@@ -81,5 +82,25 @@ func uowNests(t *testing.T, e Env) {
 	})
 	wantErr(t, err, errBoom)
 	_, err = e.Authorizations.Get(ctx(), "pay-nest")
+	wantErr(t, err, ports.ErrNotFound)
+}
+
+// uowNestedFailure: the use cases retry a whole attempt on ErrConcurrentUpdate, so a failed
+// attempt must leave nothing behind inside the unit it joined (a savepoint in Postgres).
+func uowNestedFailure(t *testing.T, e Env) {
+	err := e.UoW.Do(ctx(), func(c context.Context) error {
+		fatalIf(t, e.Authorizations.Save(c, newAuth(t, "pay-keep", "cs-keep", 0)), "save outer")
+		inner := e.UoW.Do(c, func(c context.Context) error {
+			fatalIf(t, e.Authorizations.Save(c, newAuth(t, "pay-undone", "cs-undone", 0)), "save inner")
+			return errBoom
+		})
+		wantErr(t, inner, errBoom)
+		return nil
+	})
+	fatalIf(t, err, "outer unit")
+	if _, err := e.Authorizations.Get(ctx(), "pay-keep"); err != nil {
+		t.Fatalf("the outer write must commit: %v", err)
+	}
+	_, err = e.Authorizations.Get(ctx(), "pay-undone")
 	wantErr(t, err, ports.ErrNotFound)
 }

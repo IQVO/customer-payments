@@ -24,10 +24,16 @@ func newAuth(t *testing.T, id, session string, m int) *paymentauthorization.Paym
 
 func declinedAuth(t *testing.T, id, session string) *paymentauthorization.PaymentAuthorization {
 	t.Helper()
+	return declinedAuthAt(t, id, session, 0)
+}
+
+// declinedAuthAt builds an unsaved DECLINED authorization created m minutes after t0.
+func declinedAuthAt(t *testing.T, id, session string, m int) *paymentauthorization.PaymentAuthorization {
+	t.Helper()
 	p, _, err := paymentauthorization.New(paymentauthorization.Draft{
 		ID: paymentauthorization.ID(id), CheckoutSessionID: session, PaymentMethodToken: "tok_x", Currency: "BRL", TotalMinor: 100,
 		Allocations: []paymentauthorization.AllocationInput{{GroupNo: 1, AmountMinor: 100}},
-	}, paymentauthorization.Outcome{DeclineReason: "CARD_DECLINED"}, t0)
+	}, paymentauthorization.Outcome{DeclineReason: "CARD_DECLINED"}, at(m))
 	fatalIf(t, err, "declined authorization "+id)
 	return p
 }

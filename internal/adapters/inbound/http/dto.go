@@ -60,10 +60,6 @@ type authorizationOut struct {
 	DeclineReason           string          `json:"declineReason,omitempty"`
 }
 
-type authorizationListOut struct {
-	Authorizations []authorizationOut `json:"authorizations"`
-}
-
 type refundOut struct {
 	RefundID         string `json:"refundId"`
 	AuthorizationID  string `json:"authorizationId"`
@@ -75,10 +71,6 @@ type refundOut struct {
 	Attempts         int    `json:"attempts"`
 	FailureCode      string `json:"failureCode,omitempty"`
 	ProviderRefundID string `json:"providerRefundId,omitempty"`
-}
-
-type refundListOut struct {
-	Refunds []refundOut `json:"refunds"`
 }
 
 func strPtr(s string) *string {
@@ -110,25 +102,9 @@ func authorizationFrom(v views.Authorization) authorizationOut {
 	return out
 }
 
-func authorizationListFrom(list []views.Authorization) authorizationListOut {
-	out := authorizationListOut{Authorizations: make([]authorizationOut, 0, len(list))}
-	for _, v := range list {
-		out.Authorizations = append(out.Authorizations, authorizationFrom(v))
-	}
-	return out
-}
-
 func refundFrom(v views.Refund) refundOut {
 	return refundOut{
 		RefundID: v.RefundID, AuthorizationID: v.AuthorizationID, OrderID: v.OrderID, GroupNo: v.GroupNo, AmountMinor: v.AmountMinor,
 		Reason: v.Reason, State: v.State, Attempts: v.Attempts, FailureCode: v.FailureCode, ProviderRefundID: v.ProviderRefundID,
 	}
-}
-
-func refundListFrom(list []views.Refund) refundListOut {
-	out := refundListOut{Refunds: make([]refundOut, 0, len(list))}
-	for _, v := range list {
-		out.Refunds = append(out.Refunds, refundFrom(v))
-	}
-	return out
 }

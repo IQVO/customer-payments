@@ -29,12 +29,12 @@ under *Spec versus code* below.
 
 | Tag | Endpoint | Operation id | Success | In the spec? |
 | --- | --- | --- | --- | --- |
-| Authorizations | `POST /payment-authorizations` | `authorizePayment` | `201` with the authorization this call created (also a stored `DECLINED` one); `200` when the checkout session already holds a live authorization, which is returned unchanged and the provider is not called | yes (only `201` is documented) |
-| Authorizations | `GET /payment-authorizations` | `listPaymentAuthorizations` | `200 {authorizations: [...]}`; exactly one of `orderId` or `checkoutSessionId` is required (`422` otherwise); a session lists its declined attempts too | yes |
+| Authorizations | `POST /payment-authorizations` | `authorizePayment` | `201` with the authorization this call created (also a stored `DECLINED` one); `200` when the checkout session already holds a live authorization, which is returned unchanged and the provider is not called | yes (`201` and `200`) |
+| Authorizations | `GET /payment-authorizations` | `listPaymentAuthorizations` | `200 {items: [...], nextCursor}`, oldest first, keyset-paged by `limit` and `cursor`; exactly one of `orderId` or `checkoutSessionId` is required (`422` otherwise); a session lists its declined attempts too; `400` `invalid-limit`, `invalid-cursor`, `unknown-query-parameter` | yes |
 | Authorizations | `GET /payment-authorizations/{authorizationId}` | `getPaymentAuthorization` | `200`; `404 not-found` | yes |
-| Authorizations | `POST /payment-authorizations/{authorizationId}:void` | `voidPaymentAuthorization` | `200`, state `VOIDED`, allocations `RELEASED`; `409 illegal-transition` after a capture | yes |
+| Authorizations | `POST /payment-authorizations/{authorizationId}/voids` | `voidPaymentAuthorization` | `200`, state `VOIDED`, allocations `RELEASED`; `409 illegal-transition` after a capture | yes |
 | Refunds | `POST /refunds` | `requestRefund` | `201`, the refund (possibly still `REQUESTED` after a provider outage); body `orderId`, `amountMinor`, `reason` (`LOST`, `RETURNED_TO_SENDER`, `MANUAL`), optional `groupNo` (default 0 = order level) | yes (without `groupNo`) |
-| Refunds | `GET /refunds?orderId=` | `listRefunds` | `200 {refunds: [...]}`, oldest first; `orderId` required | yes |
+| Refunds | `GET /refunds?orderId=` | `listRefunds` | `200 {items: [...], nextCursor}`, oldest first, keyset-paged by `limit` and `cursor`; `orderId` required; `400` `invalid-limit`, `invalid-cursor`, `unknown-query-parameter` | yes |
 | Refunds | `GET /refunds/{refundId}` | none | `200`; `404 not-found` | **no** |
 | Refunds | `POST /refunds/{refundId}:retry` | none | `200`; moves a `FAILED` refund back to `REQUESTED` and tries the provider again (at most 5 attempts in all) | **no** |
 | Health | `GET /healthz` | none | `200 {"status":"ok"}` | no |
@@ -46,21 +46,34 @@ under *Spec versus code* below.
 ## Conventions in the contract
 
 - **Idempotency-Key.** Required on every `POST` (the four write routes); 1 to
-  128 characters. The first response below 500 is stored per `(route, key)`; a
-  repeat of the same request replays it with `Idempotent-Replayed: true`; the
-  same key with a different request is `422 idempotency-key-reused`; a missing
-  or over-long key is `400 idempotency-key-required`. 5xx answers are never
-  stored. Provider calls carry their own deterministic keys per
+  128 printable ASCII characters, a client-generated UUID per logical submit. The
+  key is global (the same key on another route is a different request). The
+  request fingerprint is method + path + SHA-256 of the body. The first response
+  below 500 (a 4xx too) is stored for 24 hours in the same transaction as the
+  aggregate change and its outbox rows; a repeat of the same request replays it
+  byte for byte with `Idempotency-Replayed: true` (only a replay carries the
+  header); the same key with a different request is `409 idempotency-key-reused`;
+  a missing key is `400 idempotency-key-required` and a malformed or over-long
+  one `400 idempotency-key-invalid`. 5xx answers and panics roll back and are
+  never stored. Provider calls carry their own deterministic keys per
   (operation, authorization, group), so a retried request cannot move money twice.
+- **Collections are keyset-paged.** `GET /payment-authorizations` and
+  `GET /refunds` take `limit` (1 to 500, default 100) and an opaque `cursor`,
+  answer `{items, nextCursor}` (`nextCursor` is absent on the last page) and are
+  ordered by `(createdAt, id)` ascending. Filters are repeated on every page
+  request. A bad value is `400 invalid-limit` or `400 invalid-cursor`, and any
+  query parameter a list does not declare (the retired `after`, `offset`,
+  `nextToken`, `from`) is `400 unknown-query-parameter`.
 - **Money** is integer minor units (`totalMinor`, `amountMinor`) with an ISO 4217
   `currency` (`^[A-Z]{3}$`). Card numbers never appear: `paymentMethodToken` is a
   PSP token.
 - **Errors** are RFC 9457 `application/problem+json` with
   `type = /problems/<slug>`, `title`, `status`, `detail`, `instance`. Slugs:
-  `malformed-request` (400), `idempotency-key-required` (400), `not-found` (404),
+  `malformed-request`, `idempotency-key-required`, `idempotency-key-invalid`,
+  `invalid-limit`, `invalid-cursor`, `unknown-query-parameter` (400), `not-found` (404),
   `duplicate-authorization`, `over-capture`, `capture-after-expiry`,
   `order-already-bound`, `over-refund`, `concurrent-update`, `illegal-transition`
-  (409), `idempotency-key-reused`, `payment-declined`, `allocation-mismatch`,
+  `idempotency-key-reused` (409), `payment-declined`, `allocation-mismatch`,
   `unknown-group`, `negative-amount`, `validation-failed` (422),
   `payment-provider-unavailable` (503), `internal-error` (500). Causes and
   remedies: [Troubleshooting](/docs/operations/troubleshooting#rest-errors).
@@ -84,8 +97,8 @@ change):
 
 | Topic | `apis/openapi.yaml` | Code |
 | --- | --- | --- |
-| `POST /payment-authorizations` for a session with a live authorization | `201`, `409`, `422`, `503` | additionally `200` with the existing authorization (`internal/adapters/inbound/http/handlers.go`, `handleAuthorize`); a repeat with a *different* key returns the existing one rather than `409 duplicate-authorization` |
+| `POST /payment-authorizations` for a session with a live authorization | `200` (existing authorization), `201`, `400`, `409`, `422`, `503` | the `200` with the existing authorization (`internal/adapters/inbound/http/handlers.go`, `handleAuthorize`) is documented; a repeat with a *different* key returns the existing one rather than `409 duplicate-authorization` |
 | Authorization `state` enum | `AUTHORIZED`, `PARTIALLY_CAPTURED`, `CAPTURED`, `VOIDED`, `EXPIRED`, `DECLINED` | also `RELEASED` (every allocation released by cancellation; the database `CHECK` and the domain allow it) |
-| `GET /refunds/{refundId}`, `POST /refunds/{refundId}:retry` | absent | served by the router |
+| `GET /refunds/{refundId}`, `POST /refunds/{refundId}:retry` | absent | served by the router; `:retry` keeps its colon spelling and is not in the spec, so the Spectral `rest-guideline` rule cannot see it (open question in [ADR 0006](/docs/adr/0006-adopt-the-fleet-rest-api-guideline)); it sits behind the Idempotency-Key middleware like every other `POST` |
 | Refund body `groupNo`; refund response `authorizationId`, `groupNo`, `attempts`, `failureCode`, `providerRefundId` | absent from `RefundRequest` / `Refund` | accepted and returned (`internal/adapters/inbound/http/dto.go`) |
 | `/healthz`, `/readyz`, `/metrics` | absent | served by the router |

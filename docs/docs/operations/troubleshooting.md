@@ -40,8 +40,11 @@ All errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>
 
 | Status / slug | Cause | Fix |
 | --- | --- | --- |
-| 400 `idempotency-key-required` | a `POST` without `Idempotency-Key` (1 to 128 chars) | send one key per logical request |
-| 422 `idempotency-key-reused` | the same key with a different request body | mint a new key, or keep the body byte-stable per logical request; a correct replay returns the stored answer with `Idempotent-Replayed: true` |
+| 400 `idempotency-key-required` | a `POST` without `Idempotency-Key` | send one key per logical request |
+| 400 `idempotency-key-invalid` | the key is not 1 to 128 printable ASCII characters | send a UUID |
+| 409 `idempotency-key-reused` | the same key with a different request (method, path or body) | mint a new key per logical request, or keep the body byte-stable; a correct replay returns the stored answer with `Idempotency-Replayed: true`. Distinguish it from the business 409s by the problem type |
+| 400 `invalid-limit`, `invalid-cursor` | a `limit` outside 1 to 500, or a `cursor` that is not a `nextCursor` of this list | fix the value; repeat the filters with the cursor |
+| 400 `unknown-query-parameter` | a list was called with a parameter it does not declare, e.g. the retired `after`, `offset` or `nextToken` | use `limit` and `cursor`; read `items` and follow `nextCursor` |
 | 400 `malformed-request` | bad JSON, unknown field, wrong type | fix the body (see `apis/openapi.yaml`) |
 | 422 `validation-failed` | e.g. `exactly one of orderId and checkoutSessionId is required` on `GET /payment-authorizations`, or `orderId is required` on `GET /refunds` | send the missing / exclusive parameter |
 | 422 `allocation-mismatch` | allocations do not sum to `totalMinor` or repeat a `groupNo` | fix the allocations |

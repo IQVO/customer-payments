@@ -15,6 +15,7 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 
 	"github.com/IQVO/customer-payments/internal/adapters/outbound/memory"
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
 	"github.com/IQVO/customer-payments/internal/domain/refund"
@@ -377,13 +378,17 @@ func (failingAuthorizations) ListBySession(context.Context, string) ([]*paymenta
 	return nil, errBoom
 }
 
+func (failingAuthorizations) PageBySession(context.Context, string, *pagination.Keyset, int) ([]*paymentauthorization.PaymentAuthorization, error) {
+	return nil, errBoom
+}
+
 func (failingAuthorizations) FindByOrder(context.Context, string) (*paymentauthorization.PaymentAuthorization, error) {
 	return nil, errBoom
 }
 
 func (failingRefunds) Get(context.Context, refund.ID) (*refund.Refund, error) { return nil, errBoom }
 
-func (failingRefunds) ListByOrder(context.Context, string) ([]*refund.Refund, error) {
+func (failingRefunds) ListByOrder(context.Context, string, *pagination.Keyset, int) ([]*refund.Refund, error) {
 	return nil, errBoom
 }
 

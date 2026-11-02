@@ -6,23 +6,39 @@ import (
 	"testing"
 )
 
-func TestIdempotencyKeyRequiredAndReplay(t *testing.T) {
+func TestIdempotencyKeyRequiredInvalidAndReplay(t *testing.T) {
 	e := newEnv(t)
 	e.wantProblem(e.do(http.MethodPost, "/payment-authorizations", "", authorizeBody), http.StatusBadRequest, "idempotency-key-required")
-	e.wantProblem(e.do(http.MethodPost, "/payment-authorizations", strings.Repeat("k", 129), authorizeBody), http.StatusBadRequest, "idempotency-key-required")
+	for _, bad := range []string{strings.Repeat("k", 129), "caf\u00e9", "a\tb"} {
+		e.wantProblem(e.do(http.MethodPost, "/payment-authorizations", bad, authorizeBody), http.StatusBadRequest, "idempotency-key-invalid")
+	}
+	e.wantStatus(e.do(http.MethodPost, "/payment-authorizations", strings.Repeat("k", 128), strings.Replace(authorizeBody, "cs-1", "cs-long", 1)), http.StatusCreated)
 
 	first := e.do(http.MethodPost, "/payment-authorizations", "k1", authorizeBody)
 	e.wantStatus(first, http.StatusCreated)
+	if first.Header.Get("Idempotency-Replayed") != "" {
+		t.Fatal("the first execution must not carry Idempotency-Replayed")
+	}
 	again := e.do(http.MethodPost, "/payment-authorizations", "k1", authorizeBody)
 	e.wantStatus(again, http.StatusCreated)
-	if again.Body != first.Body || again.Header.Get("Idempotent-Replayed") != "true" {
-		t.Fatalf("replay differs: %q vs %q", again.Body, first.Body)
+	if again.Body != first.Body || again.Header.Get("Idempotency-Replayed") != "true" || again.Header.Get("Idempotent-Replayed") != "" {
+		t.Fatalf("replay differs: %q vs %q (%v)", again.Body, first.Body, again.Header)
 	}
 	other := strings.Replace(authorizeBody, "tok_visa", "tok_other", 1)
-	e.wantProblem(e.do(http.MethodPost, "/payment-authorizations", "k1", other), http.StatusUnprocessableEntity, "idempotency-key-reused")
-	if n := len(e.provider.Calls()); n != 1 {
-		t.Fatalf("provider calls = %d, want 1", n)
+	e.wantProblem(e.do(http.MethodPost, "/payment-authorizations", "k1", other), http.StatusConflict, "idempotency-key-reused")
+	if n := len(e.provider.Calls()); n != 2 {
+		t.Fatalf("provider calls = %d, want 2 (one per distinct key)", n)
 	}
+}
+
+// The key is global (STANDARD 2.3): the same key on another route is a different fingerprint.
+func TestIdempotencyKeyIsGlobalAcrossRoutes(t *testing.T) {
+	e := newEnv(t)
+	id := e.authorized()
+	e.wantStatus(e.do(http.MethodPost, "/payment-authorizations/"+id+"/voids", "shared", ""), http.StatusOK)
+	e.wantProblem(e.do(http.MethodPost, "/refunds", "shared", `{"orderId":"ord-1","amountMinor":5,"reason":"MANUAL"}`), http.StatusConflict, "idempotency-key-reused")
+	other := e.authorizedSession("cs-2")
+	e.wantProblem(e.do(http.MethodPost, "/payment-authorizations/"+other+"/voids", "shared", ""), http.StatusConflict, "idempotency-key-reused")
 }
 
 func TestIdempotencyRecordsClientErrorsNotServerErrors(t *testing.T) {
@@ -72,6 +88,6 @@ func TestOverlongPathIDIsNotFound(t *testing.T) {
 	long := strings.Repeat("a", 129)
 	e.wantProblem(e.get("/payment-authorizations/"+long), http.StatusNotFound, "not-found")
 	e.wantProblem(e.get("/refunds/"+long), http.StatusNotFound, "not-found")
-	e.wantProblem(e.post("/payment-authorizations/"+long+":void", ""), http.StatusNotFound, "not-found")
+	e.wantProblem(e.post("/payment-authorizations/"+long+"/voids", ""), http.StatusNotFound, "not-found")
 	e.wantProblem(e.post("/refunds/"+long+":retry", ""), http.StatusNotFound, "not-found")
 }

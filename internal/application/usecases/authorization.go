@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/application/provider"
 	"github.com/IQVO/customer-payments/internal/application/views"
@@ -108,7 +109,7 @@ func (u AuthorizePayment) create(ctx context.Context, in AuthorizePaymentInput) 
 }
 
 // VoidAuthorization is the command VoidAuthorization
-// (POST /payment-authorizations/{authorizationId}:void).
+// (POST /payment-authorizations/{authorizationId}/voids).
 type VoidAuthorization struct{ Deps }
 
 // Execute voids an uncaptured authorization at the provider and releases its
@@ -157,34 +158,57 @@ func (u GetAuthorization) Execute(ctx context.Context, id string) (views.Authori
 }
 
 // ListAuthorizations is the query ListAuthorizations
-// (GET /payment-authorizations?orderId=|checkoutSessionId=).
+// (GET /payment-authorizations?orderId=|checkoutSessionId=&limit=&cursor=).
 type ListAuthorizations struct{ Deps }
 
-// Execute lists by exactly one of orderId and checkoutSessionId; anything else
-// is shared.ErrValidation.
-func (u ListAuthorizations) Execute(ctx context.Context, orderID, sessionID string) ([]views.Authorization, error) {
+// AuthorizationPage is one page of ListAuthorizations: at most the requested
+// number of authorizations, oldest first, and the keyset to resume after when
+// more follow.
+type AuthorizationPage struct {
+	Items []views.Authorization
+	// Next is nil on the last page.
+	Next *pagination.Keyset
+}
+
+// Execute returns one page of the authorizations of exactly one of orderId and
+// checkoutSessionId (anything else is shared.ErrValidation), ordered by
+// (created-at, id) ascending, starting strictly after the keyset (nil is the
+// first page). limit must be at least 1.
+func (u ListAuthorizations) Execute(ctx context.Context, orderID, sessionID string, after *pagination.Keyset, limit int) (AuthorizationPage, error) {
 	if (orderID == "") == (sessionID == "") {
-		return nil, shared.Invalid("exactly one of orderId and checkoutSessionId is required")
+		return AuthorizationPage{}, shared.Invalid("exactly one of orderId and checkoutSessionId is required")
+	}
+	if err := requirePageLimit(limit); err != nil {
+		return AuthorizationPage{}, err
 	}
 	var found []*pa
 	if sessionID != "" {
-		list, err := u.Authorizations.ListBySession(ctx, sessionID)
+		// One row more than the page tells whether another page exists.
+		list, err := u.Authorizations.PageBySession(ctx, sessionID, after, limit+1)
 		if err != nil {
-			return nil, err
+			return AuthorizationPage{}, err
 		}
 		found = list
 	} else {
+		// At most one authorization is bound to an order.
 		p, err := u.Authorizations.FindByOrder(ctx, orderID)
 		if err != nil && !errors.Is(err, ports.ErrNotFound) {
-			return nil, err
+			return AuthorizationPage{}, err
 		}
-		if p != nil {
+		if p != nil && after.Admits(p.CreatedAt(), string(p.ID())) {
 			found = []*pa{p}
 		}
 	}
-	out := make([]views.Authorization, 0, len(found))
-	for _, p := range found {
-		out = append(out, views.AuthorizationFrom(p))
-	}
-	return out, nil
+	items, next := pageOf(found, limit, views.AuthorizationFrom,
+		func(p *pa) pagination.Keyset { return pagination.Keyset{CreatedAt: p.CreatedAt(), ID: string(p.ID())} })
+	return AuthorizationPage{Items: items, Next: next}, nil
+}
+
+// All follows the pages of Execute and returns at most ToolRowBound
+// authorizations: the complete answer for the MCP and A2A read tools.
+func (u ListAuthorizations) All(ctx context.Context, orderID, sessionID string) ([]views.Authorization, error) {
+	return collect(ctx, ToolRowBound, func(ctx context.Context, after *pagination.Keyset, limit int) ([]views.Authorization, *pagination.Keyset, error) {
+		page, err := u.Execute(ctx, orderID, sessionID, after, limit)
+		return page.Items, page.Next, err
+	})
 }

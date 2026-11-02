@@ -117,20 +117,22 @@ curl -s -X POST localhost:8080/payment-authorizations \
 ```
 
 Status `201`. Repeating the same request with the same key replays the stored
-answer (status `201`, header `Idempotent-Replayed: true`). The same key with a
-different body is `422`:
+answer (status `201`, header `Idempotency-Replayed: true`; the first execution
+never carries it). The same key with a different request (another body, or
+another route) is `409`:
 
 ```json
-{"type":"/problems/idempotency-key-reused","title":"Idempotency-Key was already used with a different request","status":422,"detail":"the Idempotency-Key was used with a different request","instance":"/payment-authorizations"}
+{"type":"/problems/idempotency-key-reused","title":"Idempotency-Key was already used with a different request","status":409,"detail":"the Idempotency-Key was used with a different request","instance":"/payment-authorizations"}
 ```
 
 No key at all is `400`:
 
 ```json
-{"type":"/problems/idempotency-key-required","title":"Idempotency-Key header is required","status":400,"detail":"send an Idempotency-Key header of 1 to 128 characters, unique per logical request","instance":"/payment-authorizations"}
+{"type":"/problems/idempotency-key-required","title":"Idempotency-Key header is required","status":400,"detail":"send an Idempotency-Key header of 1 to 128 printable ASCII characters, unique per logical request","instance":"/payment-authorizations"}
 ```
 
-**Read it back** (by id, or list by exactly one of `orderId` and `checkoutSessionId`):
+**Read it back** (by id, or list by exactly one of `orderId` and `checkoutSessionId`;
+a list answers `{"items":[...],"nextCursor":"..."}`, page it with `limit` and `cursor`):
 
 ```sh
 curl -s localhost:8080/payment-authorizations/pay-69aac12569b7
@@ -154,7 +156,7 @@ state is `DECLINED`:
 **Void before capture** releases every allocation:
 
 ```sh
-curl -s -X POST 'localhost:8080/payment-authorizations/pay-69aac12569b7:void' \
+curl -s -X POST 'localhost:8080/payment-authorizations/pay-69aac12569b7/voids' \
   -H 'Content-Type: application/json' -H 'Idempotency-Key: doc-void-1' -d '{}'
 ```
 

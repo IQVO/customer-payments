@@ -19,14 +19,6 @@ import (
 	"github.com/IQVO/customer-payments/internal/application/usecases"
 )
 
-// Route names under which the Idempotency-Key records are stored.
-const (
-	routeAuthorize = "POST /payment-authorizations"
-	routeVoid      = "POST /payment-authorizations/{authorizationId}:void"
-	routeRefund    = "POST /refunds"
-	routeRetry     = "POST /refunds/{refundId}:retry"
-)
-
 // Server holds the use cases the handlers call.
 type Server struct {
 	AuthorizePayment   usecases.AuthorizePayment
@@ -38,8 +30,8 @@ type Server struct {
 	GetRefund          usecases.GetRefund
 	ListRefunds        usecases.ListRefunds
 
-	// IdempotencyStore and Clock back the Idempotency-Key middleware of the
-	// POST routes.
+	// IdempotencyStore and Clock back the Idempotency-Key middleware of every
+	// POST route.
 	IdempotencyStore ports.IdempotencyStore
 	Clock            ports.Clock
 	// ParkedFacts backs the gauge of GET /metrics (H10): how many fulfilment
@@ -81,18 +73,16 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.Get("/readyz", s.handleReadyz)
 	r.Get("/metrics", s.handleMetrics)
 
-	r.With(s.idempotent(routeAuthorize)).Post("/payment-authorizations", s.handleAuthorize)
+	idempotent := RequireIdempotencyKey(s.IdempotencyStore, s.Clock)
+
+	r.With(idempotent).Post("/payment-authorizations", s.handleAuthorize)
 	r.Get("/payment-authorizations", s.handleListAuthorizations)
 	r.Get("/payment-authorizations/{authorizationId}", s.handleGetAuthorization)
-	r.With(s.idempotent(routeVoid)).Post("/payment-authorizations/{authorizationId}:void", s.handleVoid)
+	r.With(idempotent).Post("/payment-authorizations/{authorizationId}/voids", s.handleVoid)
 
-	r.With(s.idempotent(routeRefund)).Post("/refunds", s.handleRequestRefund)
+	r.With(idempotent).Post("/refunds", s.handleRequestRefund)
 	r.Get("/refunds", s.handleListRefunds)
 	r.Get("/refunds/{refundId}", s.handleGetRefund)
-	r.With(s.idempotent(routeRetry)).Post("/refunds/{refundId}:retry", s.handleRetryRefund)
+	r.With(idempotent).Post("/refunds/{refundId}:retry", s.handleRetryRefund)
 	return r
-}
-
-func (s *Server) idempotent(route string) func(http.Handler) http.Handler {
-	return RequireIdempotencyKey(s.IdempotencyStore, s.Clock, route)
 }

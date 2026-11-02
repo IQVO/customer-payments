@@ -127,7 +127,7 @@ binary and one pod:
 
 - **REST API** on `HTTP_ADDR` (default `:8080`): `POST /payment-authorizations`,
   `GET /payment-authorizations`, `GET /payment-authorizations/{authorizationId}`,
-  `POST /payment-authorizations/{authorizationId}:void`, `POST /refunds`,
+  `POST /payment-authorizations/{authorizationId}/voids`, `POST /refunds`,
   `GET /refunds`, `GET /refunds/{refundId}`,
   `POST /refunds/{refundId}:retry` (`internal/adapters/inbound/http/server.go`).
 - **Transactional outbox relay**: polls the `outbox_events` table every
@@ -260,12 +260,18 @@ the same group (`charts/customer-payments/values.yaml`).
 
 Behavior — Idempotency-Key middleware (`internal/adapters/inbound/http/idempotency.go`):
 
-- Every POST route (`/payment-authorizations`, the `:void`, `/refunds`,
-  `:retry`) requires an `Idempotency-Key` header.
-- The first response below 500 is stored per `(route, key)`; a repeat with the
-  same request replays it with header `Idempotent-Replayed: true`; the same key
-  with a different request is 422 problem `idempotency-key-reused`.
-- 5xx responses are never stored, so the key stays retryable.
+- Every POST route (`/payment-authorizations`, `.../voids`, `/refunds`,
+  `:retry`) requires an `Idempotency-Key` header of 1 to 128 printable ASCII
+  characters (absent: 400 `idempotency-key-required`, malformed: 400
+  `idempotency-key-invalid`).
+- The key is global. The first response below 500 (a 4xx too) is stored for 24
+  hours in the same transaction as the aggregate change and its outbox rows; a
+  repeat with the same request (method + path + body hash) replays it with
+  header `Idempotency-Replayed: true`; the same key with a different request is
+  409 problem `idempotency-key-reused`. Concurrent requests with one key are
+  serialised by the unique index on `idempotency_keys`; the loser replays.
+- 5xx responses and panics roll back and are never stored, so the key stays
+  retryable.
 
 ## Alerts and dashboards
 
@@ -342,10 +348,11 @@ Behavior — Idempotency-Key middleware (`internal/adapters/inbound/http/idempot
 
 ### idempotency-key-reused storms
 
-- Symptom: a burst of 422 `idempotency-key-reused` from the POST routes.
+- Symptom: a burst of 409 `idempotency-key-reused` from the POST routes.
 - Diagnosis: the middleware hashes the request, so a storm means callers reuse
   a key while regenerating the body (timestamps, ids). Correct replays come
-  back with `Idempotent-Replayed: true` and are not a fault.
+  back with `Idempotency-Replayed: true` and are not a fault. The same key sent
+  to two different routes is a reuse too (the key is global).
 - Action: fix the caller to keep the body byte-stable per logical request or
   mint a fresh key.
 

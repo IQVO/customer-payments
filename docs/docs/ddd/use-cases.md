@@ -23,7 +23,7 @@ adapter maps them to problem slugs ([API overview](/docs/api-reference)).
 | Use case | Trigger | Inbound adapter | Events raised |
 | --- | --- | --- | --- |
 | `AuthorizePayment` | checkout | `POST /payment-authorizations` | `PaymentAuthorized` or `PaymentDeclined` |
-| `VoidAuthorization` | checkout; policy `VoidUnboundAuthorizations` | `POST /payment-authorizations/{authorizationId}:void`; policy loop | `PaymentReleased` (reason `VOIDED`, one per allocation) |
+| `VoidAuthorization` | checkout; policy `VoidUnboundAuthorizations` | `POST /payment-authorizations/{authorizationId}/voids`; policy loop | `PaymentReleased` (reason `VOIDED`, one per allocation) |
 | `GetAuthorization`, `ListAuthorizations` | checkout, ops, MCP, A2A | `GET /payment-authorizations...`, MCP, A2A | none |
 | `RequestRefund` | storefront ops | `POST /refunds` | `RefundIssued` or `RefundFailed` |
 | `RetryRefund` | storefront ops | `POST /refunds/{refundId}:retry` | `RefundIssued` or `RefundFailed` |
@@ -96,8 +96,11 @@ adapter maps them to problem slugs ([API overview](/docs/api-reference)).
 `GetAuthorization`, `ListAuthorizations` (exactly one of `orderId` and
 `checkoutSessionId`, else `validation-failed`; a session lists declined attempts,
 an order lists its one bound authorization or nothing), `GetRefund`, `ListRefunds`
-(`orderId` required, oldest first). The same four use cases back the MCP tools and
-the A2A skills.
+(`orderId` required, oldest first). The two lists return one keyset page
+(`Execute(..., after, limit)`: `limit` rows, ordered by `(createdAt, id)`, and the
+keyset to resume after). The same four use cases back the MCP tools and the A2A
+skills, which keep their own tool schemas and follow every page through
+`All` (up to 1000 rows) so they still return complete data.
 
 ## Consumed events
 

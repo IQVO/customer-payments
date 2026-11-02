@@ -71,7 +71,7 @@ visible only in the database (`outbox_events WHERE published_at IS NULL`, see
 
 | Span | Kind | Created by | Attributes |
 | --- | --- | --- | --- |
-| `<METHOD> <route pattern>` (e.g. `POST /payment-authorizations/{authorizationId}:void`) | server | `otelchi` middleware, all three binaries; named after the chi route pattern so there is one span name per route, not per id | HTTP semantic-convention attributes |
+| `<METHOD> <route pattern>` (e.g. `POST /payment-authorizations/{authorizationId}/voids`) | server | `otelchi` middleware, all three binaries; named after the chi route pattern so there is one span name per route, not per id | HTTP semantic-convention attributes |
 | `<topic> process` (e.g. `retailnetwork.checkout.events process`) | consumer | `internal/adapters/inbound/kafka/tracing.go`, one per handling attempt | `messaging.system=kafka`, `messaging.destination.name`, `messaging.operation.name=process`; errors recorded with status `Error` |
 | `a2a.skill <skill>` (`a2a.skill get_payment_status`, `a2a.skill get_refund_status`) | internal | `internal/adapters/inbound/a2a/skills.go` | `a2a.skill`; status `Error` when the skill answers a problem |
 

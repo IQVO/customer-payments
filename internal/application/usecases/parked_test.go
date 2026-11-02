@@ -47,8 +47,8 @@ func TestLostBeforeShipmentWaitsForTheCapture(t *testing.T) {
 	if n, _ := e.store.Parked().Count(context.Background()); n != 0 {
 		t.Errorf("parked after shipment = %d", n)
 	}
-	refunds, _ := usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1")
-	if len(refunds) != 1 || refunds[0].AmountMinor != 7000 || refunds[0].Reason != "LOST" || refunds[0].State != "SUCCEEDED" {
+	refunds, _ := usecases.ListRefunds{Deps: e.deps}.Execute(context.Background(), "ord-1", nil, 100)
+	if len(refunds.Items) != 1 || refunds.Items[0].AmountMinor != 7000 || refunds.Items[0].Reason != "LOST" || refunds.Items[0].State != "SUCCEEDED" {
 		t.Fatalf("refunds = %+v", refunds)
 	}
 }
