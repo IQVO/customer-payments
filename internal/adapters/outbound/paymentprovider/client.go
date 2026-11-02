@@ -31,6 +31,9 @@ const maxResponseBytes = 1 << 20
 type Client struct {
 	base *url.URL
 	http *http.Client
+	// br is the circuit breaker around the transport (portfolio rec
+	// 2026-11-02): transport failures open it, it fails fast while open.
+	br *breaker
 }
 
 var _ ports.PaymentProvider = (*Client)(nil)
@@ -45,7 +48,7 @@ func New(baseURL string, httpClient *http.Client) (*Client, error) {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: DefaultTimeout}
 	}
-	return &Client{base: u, http: httpClient}, nil
+	return &Client{base: u, http: httpClient, br: newBreaker(DefaultBreakerThreshold, DefaultBreakerCooldown, nil)}, nil
 }
 
 type amountBody struct {
@@ -131,8 +134,13 @@ func (c *Client) idCall(ctx context.Context, key, holdID, sub string, amountMino
 
 // post sends one idempotent JSON POST. 2xx decodes into out (when non-nil);
 // 402 is a definitive decline; a transport failure, a timeout, 429 and 5xx are
-// provider.ErrUnavailable; any other status is a contract error.
+// provider.ErrUnavailable; any other status is a contract error. Every call
+// passes the circuit breaker: while it is open the call fails fast with
+// provider.ErrUnavailable, and only transport failures (send, read) trip it.
 func (c *Client) post(ctx context.Context, path, key string, body, out any) error {
+	if err := c.br.allow(); err != nil {
+		return err
+	}
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("encode provider request: %w", err)
@@ -145,13 +153,16 @@ func (c *Client) post(ctx context.Context, path, key string, body, out any) erro
 	req.Header.Set("Idempotency-Key", key)
 	resp, err := c.http.Do(req)
 	if err != nil {
+		c.br.failure()
 		return fmt.Errorf("%w: %w", provider.ErrUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
+		c.br.failure()
 		return fmt.Errorf("%w: reading the answer: %w", provider.ErrUnavailable, err)
 	}
+	c.br.success()
 	return answer(resp.StatusCode, data, out)
 }
 
