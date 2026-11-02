@@ -139,6 +139,7 @@ operations:
 components:
   messages:
     PaymentAuthorized:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: PaymentAuthorized
       title: PaymentAuthorized
       summary: PaymentAuthorized event.
@@ -169,6 +170,7 @@ components:
             - groupNo: 2
               amountMinor: 3000
     PaymentCaptured:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: PaymentCaptured
       title: PaymentCaptured
       summary: PaymentCaptured event.
@@ -193,6 +195,7 @@ components:
             groupNo: 1
             amountMinor: 7000
     PaymentReleased:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: PaymentReleased
       title: PaymentReleased
       summary: PaymentReleased event.
@@ -218,6 +221,7 @@ components:
             amountMinor: 3000
             reason: CANCELLED
     PaymentAuthorizationExpired:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: PaymentAuthorizationExpired
       title: PaymentAuthorizationExpired
       summary: PaymentAuthorizationExpired event.
@@ -241,6 +245,7 @@ components:
             orderId: ord-1
             expiredAt: '2026-10-24T09:00:00Z'
     PaymentDeclined:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: PaymentDeclined
       title: PaymentDeclined
       summary: PaymentDeclined event.
@@ -265,6 +270,7 @@ components:
             reason: CARD_DECLINED
             at: '2026-10-24T09:00:00Z'
     PaymentReauthorized:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: PaymentReauthorized
       title: PaymentReauthorized
       summary: PaymentReauthorized event.
@@ -289,6 +295,7 @@ components:
             expiresAt: '2026-11-07T09:00:00Z'
             providerAuthorizationId: hold-2
     RefundIssued:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: RefundIssued
       title: RefundIssued
       summary: RefundIssued event.
@@ -315,6 +322,7 @@ components:
             amountMinor: 7000
             reason: LOST
     RefundFailed:
+      x-no-consumer-reason: "analytics-only by design (ADR 0003, model gap H9): published on retailnetwork.customer-payments.events, but no sibling context reacts to it"
       name: RefundFailed
       title: RefundFailed
       summary: RefundFailed event.
