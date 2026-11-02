@@ -79,3 +79,7 @@ This repository is part of the Storefront domain. It consumes the retail
 network's published `retailnetwork.*` events and calls no route of any sibling
 context: its only synchronous outbound call is to the payment provider. See
 [Integration](/docs/ecosystem/integration).
+
+:::note[Disclaimer]
+This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
+:::
