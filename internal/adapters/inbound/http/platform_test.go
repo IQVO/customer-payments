@@ -89,5 +89,5 @@ func TestOverlongPathIDIsNotFound(t *testing.T) {
 	e.wantProblem(e.get("/payment-authorizations/"+long), http.StatusNotFound, "not-found")
 	e.wantProblem(e.get("/refunds/"+long), http.StatusNotFound, "not-found")
 	e.wantProblem(e.post("/payment-authorizations/"+long+"/voids", ""), http.StatusNotFound, "not-found")
-	e.wantProblem(e.post("/refunds/"+long+":retry", ""), http.StatusNotFound, "not-found")
+	e.wantProblem(e.post("/refunds/"+long+"/retries", ""), http.StatusNotFound, "not-found")
 }

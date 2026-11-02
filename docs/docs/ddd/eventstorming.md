@@ -225,5 +225,5 @@ The model's twelve hotspots (H1 to H12) are resolved in the code; what remains o
 | 1 | **No consumer of the eight events.** All are analytics-only by contract; nobody reacts. | `apis/asyncapi.yaml`; [Integration](/docs/ecosystem/integration) |
 | 2 | **No alerting** on `payments.authorizations.decided`, parked facts, unpublished outbox rows or a failed refund; only ERROR log lines (`ALERT refund failed for good`, `ALERT fact for an unbound order dead-lettered`). | [Observability](/docs/operations/observability#dashboards-and-alerts) |
 | 3 | **A fact for a tracking number no capture carries** is parked until 24 h, then escalated; a lost package whose shipment fact never arrived is never refunded automatically. | `facts.go` (`refundPackage`), `policies.go` |
-| 4 | **OpenAPI drift**: `RELEASED`, `GET /refunds/{refundId}` and `POST /refunds/{refundId}:retry` are not in `apis/openapi.yaml` (the `200` replay is). | [API overview](/docs/api-reference#spec-versus-code) |
+| 4 | **OpenAPI drift**: the authorization state `RELEASED` is not in `apis/openapi.yaml` (the `200` replay is). | [API overview](/docs/api-reference#spec-versus-code) |
 | 5 | **Expiry without re-authorization**: a provider outage longer than the 24 h lead lets a hold lapse; the next pass expires the authorization without asking the provider. | `policies.go` (`renew`) |

@@ -129,7 +129,7 @@ binary and one pod:
   `GET /payment-authorizations`, `GET /payment-authorizations/{authorizationId}`,
   `POST /payment-authorizations/{authorizationId}/voids`, `POST /refunds`,
   `GET /refunds`, `GET /refunds/{refundId}`,
-  `POST /refunds/{refundId}:retry` (`internal/adapters/inbound/http/server.go`).
+  `POST /refunds/{refundId}/retries` (`internal/adapters/inbound/http/server.go`).
 - **Transactional outbox relay**: polls the `outbox_events` table every
   `OUTBOX_RELAY_INTERVAL` and publishes pending rows to Kafka
   (`cmd/api/main.go` `startOutboxRelay`, `internal/adapters/outbound/outbox/relay.go`).
@@ -261,7 +261,7 @@ the same group (`charts/customer-payments/values.yaml`).
 Behavior — Idempotency-Key middleware (`internal/adapters/inbound/http/idempotency.go`):
 
 - Every POST route (`/payment-authorizations`, `.../voids`, `/refunds`,
-  `:retry`) requires an `Idempotency-Key` header of 1 to 128 printable ASCII
+  `/refunds/{refundId}/retries`) requires an `Idempotency-Key` header of 1 to 128 printable ASCII
   characters (absent: 400 `idempotency-key-required`, malformed: 400
   `idempotency-key-invalid`).
 - The key is global. The first response below 500 (a 4xx too) is stored for 24

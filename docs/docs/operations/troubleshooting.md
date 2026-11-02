@@ -98,7 +98,7 @@ session).
 | Symptom | Cause | Check | Fix |
 | --- | --- | --- | --- |
 | Refund stays `REQUESTED` | the provider was unreachable during the request (WARN `refund left REQUESTED: payment provider unavailable`) | `refunds.state`, `created_at` | nothing: `process-requested-refunds` retries every `POLICY_INTERVAL` once the refund is 30 s old |
-| Refund `FAILED` | the provider declined it (`failureCode`) | `GET /refunds/{refundId}` (`attempts`, `failureCode`) | fix the cause, then `POST /refunds/{refundId}:retry` with a new `Idempotency-Key`; at most 5 provider attempts in all |
+| Refund `FAILED` | the provider declined it (`failureCode`) | `GET /refunds/{refundId}` (`attempts`, `failureCode`) | fix the cause, then `POST /refunds/{refundId}/retries` with a new `Idempotency-Key`; at most 5 provider attempts in all |
 | ERROR `ALERT refund failed for good: operator action needed` | the fifth attempt failed; the `RefundFailed` event has `final: true` | `refund_id`, `order_id`, `code`, `attempts` | the refund stays `FAILED`; settle with the provider manually, then request a new `MANUAL` refund |
 
 ## MCP and A2A

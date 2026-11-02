@@ -137,13 +137,13 @@ func TestRefundRetryRoute(t *testing.T) {
 		t.Fatalf("body = %s", r.Body)
 	}
 	e.provider.Fail("refund", nil)
-	ok := e.post("/refunds/"+id+":retry", "")
+	ok := e.post("/refunds/"+id+"/retries", "")
 	e.wantStatus(ok, http.StatusOK)
 	if ok.json(t)["state"] != "SUCCEEDED" {
 		t.Fatalf("body = %s", ok.Body)
 	}
-	e.wantProblem(e.post("/refunds/"+id+":retry", ""), http.StatusConflict, "illegal-transition")
-	e.wantProblem(e.post("/refunds/nope:retry", ""), http.StatusNotFound, "not-found")
+	e.wantProblem(e.post("/refunds/"+id+"/retries", ""), http.StatusConflict, "illegal-transition")
+	e.wantProblem(e.post("/refunds/nope/retries", ""), http.StatusNotFound, "not-found")
 }
 
 func TestMetricsExposeTheParkedFactsGauge(t *testing.T) {
