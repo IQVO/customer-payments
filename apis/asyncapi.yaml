@@ -18,7 +18,7 @@ info:
 
     **Published.** Eight events on `retailnetwork.customer-payments.events` through a **transactional outbox** (state and already-encoded events are written in ONE database transaction; an always-on relay drains them to Kafka, at-least-once, the CloudEvents `id` is stored with the outbox row). Every published event is analytics-only by design for its consumers (no sibling reacts to them).
 
-    **Consumed.** CheckoutCompleted from checkout, FulfillmentShipped, FulfillmentCancelled and FulfillmentUnsourceable from order-sourcing, PackageLost and PackageReturned from shipping-and-tracking. Facts for an order that is not yet bound are parked and applied when CheckoutCompleted binds the order; facts still unknown after 24 hours are dead-lettered with an alert. Messages list only the fields this service relies on; unknown fields are ignored. Each consumer group name comes from a mandatory environment variable.
+    **Consumed.** CheckoutCompleted from checkout, FulfillmentShipped, FulfillmentCancelled and FulfillmentUnsourceable from order-sourcing, PackageLost and PackageReturned from shipping-and-tracking. Facts for an order that is not yet bound are parked and applied when CheckoutCompleted binds the order; facts still unknown after 24 hours are dead-lettered with an alert. Messages list only the fields this service relies on; unknown fields are ignored. Each consumer group name comes from a mandatory environment variable (`CHECKOUT_CONSUMER_GROUP`, `ORDER_SOURCING_CONSUMER_GROUP`, `SHIPPING_AND_TRACKING_CONSUMER_GROUP`). A handled event whose payload can never be applied is dead-lettered at once to `<topic>.dlq`; a transient failure is retried with backoff and then dead-lettered the same way; a message that is not a CloudEvent, or of an unknown type, is skipped. Parked facts that stay unbound for 24 hours are also written, as a plain JSON object keyed by order id (not a CloudEvent), to `retailnetwork.customer-payments.unbound-facts.dlq`.
 
     **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka header `content-type: application/cloudevents+json; charset=UTF-8`. `specversion`, `id`, `source` (`/retailnetwork/customer-payments`), `type`, `subject` (authorizationId, or refundId for refund events), `time`, `datacontenttype` (`application/json`) and `dataschema` (`urn:retailnetwork:customer-payments:events:<EventName>:v1`) are all required. Kafka key = the subject. Type = `com.retailnetwork.storefront.customer-payments.<entity>.<EventName>`. A breaking payload change is a new `.v2` type, never a mutation. Dispatch on the full `type`, ignore unknown types, dedupe on `id`.
 
@@ -310,7 +310,7 @@ components:
           id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
           source: /retailnetwork/customer-payments
           type: com.retailnetwork.storefront.customer-payments.refund.RefundIssued
-          subject: pay-1
+          subject: ref-1
           time: '2026-10-26T12:00:00Z'
           datacontenttype: application/json
           dataschema: urn:retailnetwork:customer-payments:events:RefundIssued:v1
@@ -337,7 +337,7 @@ components:
           id: 9f7c2a1e-4b3d-4c5a-8e6f-1a2b3c4d5e6f
           source: /retailnetwork/customer-payments
           type: com.retailnetwork.storefront.customer-payments.refund.RefundFailed
-          subject: pay-1
+          subject: ref-1
           time: '2026-10-26T12:00:00Z'
           datacontenttype: application/json
           dataschema: urn:retailnetwork:customer-payments:events:RefundFailed:v1
@@ -512,6 +512,16 @@ components:
           type: array
           items:
             type: object
+            required:
+            - groupNo
+            - amountMinor
+            properties:
+              groupNo:
+                type: integer
+                minimum: 1
+              amountMinor:
+                type: integer
+                minimum: 0
       description: Wire payload (CloudEvents `data`, camelCase).
     PaymentAuthorizedEvent:
       type: object
@@ -731,6 +741,7 @@ components:
       type: object
       required:
       - authorizationId
+      - checkoutSessionId
       - reason
       - at
       properties:
@@ -843,6 +854,7 @@ components:
       type: object
       required:
       - refundId
+      - orderId
       - authorizationId
       - amountMinor
       - reason
@@ -856,9 +868,10 @@ components:
         groupNo:
           type: integer
           minimum: 1
+          description: Omitted for an order-level refund.
         amountMinor:
           type: integer
-          minimum: 0
+          minimum: 1
         reason:
           type: string
           enum:
@@ -909,6 +922,7 @@ components:
       type: object
       required:
       - refundId
+      - orderId
       - authorizationId
       - code
       - attempts
@@ -923,13 +937,16 @@ components:
         groupNo:
           type: integer
           minimum: 1
+          description: Omitted for an order-level refund.
         code:
           type: string
         attempts:
           type: integer
           minimum: 1
+          maximum: 5
         final:
           type: boolean
+          description: true when the 5 attempts are used (operator action needed).
       description: Wire payload (CloudEvents `data`, camelCase).
     RefundFailedEvent:
       type: object
@@ -973,7 +990,6 @@ components:
     CheckoutCompletedData:
       type: object
       required:
-      - sessionId
       - orderId
       - authorizationId
       properties:
@@ -1028,7 +1044,6 @@ components:
       required:
       - orderId
       - groupNo
-      - trackingNumbers
       properties:
         orderId:
           type: string
@@ -1187,12 +1202,14 @@ components:
     PackageLostData:
       type: object
       required:
+      - orderId
       - trackingNumber
       properties:
         orderId:
           type: string
         trackingNumber:
           type: string
+          minLength: 1
       description: The fields this service reads (the producer's payload carries more).
     ConsumedPackageLostEvent:
       type: object
@@ -1236,12 +1253,14 @@ components:
     PackageReturnedData:
       type: object
       required:
+      - orderId
       - trackingNumber
       properties:
         orderId:
           type: string
         trackingNumber:
           type: string
+          minLength: 1
       description: The fields this service reads (the producer's payload carries more).
     ConsumedPackageReturnedEvent:
       type: object
