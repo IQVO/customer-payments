@@ -48,6 +48,7 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+    errcheck:
       check-type-assertions: true
     revive:
       rules:
