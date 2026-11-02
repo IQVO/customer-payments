@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/parked"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
@@ -59,8 +60,12 @@ func (r *RefundRepository) sorted(match func(refund.Snapshot) bool) []refund.Sna
 }
 
 func (r *RefundRepository) list(match func(refund.Snapshot) bool) ([]*refund.Refund, error) {
-	out := []*refund.Refund{}
-	for _, snap := range r.sorted(match) {
+	return r.restore(r.sorted(match))
+}
+
+func (r *RefundRepository) restore(snaps []refund.Snapshot) ([]*refund.Refund, error) {
+	out := make([]*refund.Refund, 0, len(snaps))
+	for _, snap := range snaps {
 		f, err := refund.Restore(snap)
 		if err != nil {
 			return nil, err
@@ -70,10 +75,17 @@ func (r *RefundRepository) list(match func(refund.Snapshot) bool) ([]*refund.Ref
 	return out, nil
 }
 
-// ListByOrder implements ports.RefundRepository.
-func (r *RefundRepository) ListByOrder(ctx context.Context, orderID string) ([]*refund.Refund, error) {
+// ListByOrder implements ports.RefundRepository: (created-at, id) ascending,
+// strictly after the keyset, at most limit rows.
+func (r *RefundRepository) ListByOrder(ctx context.Context, orderID string, after *pagination.Keyset, limit int) ([]*refund.Refund, error) {
 	defer r.s.enter(ctx)()
-	return r.list(func(s refund.Snapshot) bool { return s.Request.OrderID == orderID })
+	snaps := r.sorted(func(s refund.Snapshot) bool {
+		return s.Request.OrderID == orderID && after.Admits(s.CreatedAt, string(s.Request.ID))
+	})
+	if limit >= 0 && len(snaps) > limit {
+		snaps = snaps[:limit]
+	}
+	return r.restore(snaps)
 }
 
 // ListByAuthorization implements ports.RefundRepository.

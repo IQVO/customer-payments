@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/application/provider"
 	"github.com/IQVO/customer-payments/internal/application/views"
@@ -161,23 +162,46 @@ func (u GetRefund) Execute(ctx context.Context, id string) (views.Refund, error)
 	return views.RefundFrom(f), nil
 }
 
-// ListRefunds is the query ListRefunds (GET /refunds?orderId=).
+// ListRefunds is the query ListRefunds (GET /refunds?orderId=&limit=&cursor=).
 type ListRefunds struct{ Deps }
 
-// Execute lists the refunds of the order, oldest first.
-func (u ListRefunds) Execute(ctx context.Context, orderID string) ([]views.Refund, error) {
+// RefundPage is one page of ListRefunds: at most the requested number of
+// refunds, oldest first, and the keyset to resume after when more follow.
+type RefundPage struct {
+	Items []views.Refund
+	// Next is nil on the last page.
+	Next *pagination.Keyset
+}
+
+// Execute returns one page of the refunds of the order, ordered by
+// (created-at, id) ascending, starting strictly after the keyset (nil is the
+// first page). limit must be at least 1.
+func (u ListRefunds) Execute(ctx context.Context, orderID string, after *pagination.Keyset, limit int) (RefundPage, error) {
 	if orderID == "" {
-		return nil, shared.Invalid("orderId is required")
+		return RefundPage{}, shared.Invalid("orderId is required")
 	}
-	list, err := u.Refunds.ListByOrder(ctx, orderID)
+	if err := requirePageLimit(limit); err != nil {
+		return RefundPage{}, err
+	}
+	// One row more than the page tells whether another page exists.
+	list, err := u.Refunds.ListByOrder(ctx, orderID, after, limit+1)
 	if err != nil {
-		return nil, err
+		return RefundPage{}, err
 	}
-	out := make([]views.Refund, 0, len(list))
-	for _, f := range list {
-		out = append(out, views.RefundFrom(f))
-	}
-	return out, nil
+	items, next := pageOf(list, limit, views.RefundFrom,
+		func(f *refund.Refund) pagination.Keyset {
+			return pagination.Keyset{CreatedAt: f.CreatedAt(), ID: string(f.ID())}
+		})
+	return RefundPage{Items: items, Next: next}, nil
+}
+
+// All follows the pages of Execute and returns at most ToolRowBound refunds:
+// the complete answer for the MCP and A2A read tools.
+func (u ListRefunds) All(ctx context.Context, orderID string) ([]views.Refund, error) {
+	return collect(ctx, ToolRowBound, func(ctx context.Context, after *pagination.Keyset, limit int) ([]views.Refund, *pagination.Keyset, error) {
+		page, err := u.Execute(ctx, orderID, after, limit)
+		return page.Items, page.Next, err
+	})
 }
 
 // refundSettleDelay is how long a REQUESTED refund is left alone before the

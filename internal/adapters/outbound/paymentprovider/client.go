@@ -89,7 +89,7 @@ func (c *Client) Capture(ctx context.Context, key, holdID string, amountMinor in
 
 // Void implements ports.PaymentProvider.
 func (c *Client) Void(ctx context.Context, key, holdID string) error {
-	return c.post(ctx, "/authorizations/"+url.PathEscape(holdID)+"/void", key, struct{}{}, nil)
+	return c.post(ctx, "/authorizations/"+url.PathEscape(holdID)+"/voids", key, struct{}{}, nil)
 }
 
 // Refund implements ports.PaymentProvider.
@@ -100,7 +100,7 @@ func (c *Client) Refund(ctx context.Context, key, holdID string, amountMinor int
 // Reauthorize implements ports.PaymentProvider.
 func (c *Client) Reauthorize(ctx context.Context, key, holdID string, amountMinor int64) (provider.Hold, error) {
 	var a holdAnswer
-	if err := c.post(ctx, "/authorizations/"+url.PathEscape(holdID)+"/reauthorize", key, amountBody{amountMinor}, &a); err != nil {
+	if err := c.post(ctx, "/authorizations/"+url.PathEscape(holdID)+"/reauthorizations", key, amountBody{amountMinor}, &a); err != nil {
 		return provider.Hold{}, err
 	}
 	return a.hold()
@@ -108,7 +108,7 @@ func (c *Client) Reauthorize(ctx context.Context, key, holdID string, amountMino
 
 // ReduceAuthorization implements ports.PaymentProvider.
 func (c *Client) ReduceAuthorization(ctx context.Context, key, holdID string, amountMinor int64) error {
-	return c.post(ctx, "/authorizations/"+url.PathEscape(holdID)+"/reduce", key, amountBody{amountMinor}, nil)
+	return c.post(ctx, "/authorizations/"+url.PathEscape(holdID)+"/reductions", key, amountBody{amountMinor}, nil)
 }
 
 func (a holdAnswer) hold() (provider.Hold, error) {

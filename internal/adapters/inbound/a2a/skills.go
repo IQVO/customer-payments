@@ -216,7 +216,7 @@ func (d Deps) getPaymentStatus(ctx context.Context, rawArgs json.RawMessage) (au
 	if sel.name == "checkoutSessionId" {
 		orderID, sessionID = "", sel.value
 	}
-	list, err := d.ListAuthorizations.Execute(ctx, orderID, sessionID)
+	list, err := d.ListAuthorizations.All(ctx, orderID, sessionID)
 	if err != nil {
 		return authorizationListDTO{}, problemFromUseCase(err, "")
 	}
@@ -251,7 +251,7 @@ func (d Deps) getRefundStatus(ctx context.Context, rawArgs json.RawMessage) (ref
 		out.Refunds = append(out.Refunds, toRefundDTO(v))
 		return out, nil
 	}
-	list, err := d.ListRefunds.Execute(ctx, sel.value)
+	list, err := d.ListRefunds.All(ctx, sel.value)
 	if err != nil {
 		return refundListDTO{}, problemFromUseCase(err, "")
 	}

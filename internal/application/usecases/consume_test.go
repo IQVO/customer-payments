@@ -19,8 +19,8 @@ func shipped(group int, tracking ...string) usecases.Fact {
 func TestCheckoutCompletedBindsTheOrder(t *testing.T) {
 	e := newEnv(t)
 	id := e.bound()
-	list, _ := usecases.ListAuthorizations{Deps: e.deps}.Execute(context.Background(), "ord-1", "")
-	if len(list) != 1 || list[0].AuthorizationID != id {
+	list, _ := usecases.ListAuthorizations{Deps: e.deps}.Execute(context.Background(), "ord-1", "", nil, 100)
+	if len(list.Items) != 1 || list.Items[0].AuthorizationID != id {
 		t.Fatalf("bound list = %+v", list)
 	}
 	e.completed("evt-cc-2", id, "ord-1")

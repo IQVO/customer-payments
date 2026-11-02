@@ -28,8 +28,6 @@ import (
 	"github.com/IQVO/customer-payments/internal/domain/shared"
 )
 
-type idemKey struct{ route, key string }
-
 // Store is the shared state of the in-memory doubles.
 type Store struct {
 	mu          sync.Mutex
@@ -38,7 +36,7 @@ type Store struct {
 	parked      map[string]parked.Fact
 	inbox       map[string]string
 	outbox      []shared.Event
-	idempotency map[idemKey]idempotency.Record
+	idempotency map[string]idempotency.Record
 	clock       ports.Clock
 }
 
@@ -50,7 +48,7 @@ func NewStore(clock ports.Clock) *Store {
 	return &Store{
 		auths: map[paymentauthorization.ID]paymentauthorization.Snapshot{}, refunds: map[refund.ID]refund.Snapshot{},
 		parked: map[string]parked.Fact{}, inbox: map[string]string{},
-		idempotency: map[idemKey]idempotency.Record{}, clock: clock,
+		idempotency: map[string]idempotency.Record{}, clock: clock,
 	}
 }
 

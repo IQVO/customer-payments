@@ -114,8 +114,8 @@ func TestRealWiringFactBeforeBindingIsParkedThenApplied(t *testing.T) {
 func TestRealWiringVoidReleasesTheHold(t *testing.T) {
 	s, fake := bootReal(t, "void")
 	id := authorize(t, s, "cs-v")
-	r := s.call(t, "POST", "/payment-authorizations/"+id+":void", "void-1", "")
-	if r.status != 200 || r.field(t, "state") != "VOIDED" || fake.Effects("void") != 1 {
+	r := s.call(t, "POST", "/payment-authorizations/"+id+"/voids", "void-1", "")
+	if r.status != 200 || r.field(t, "state") != "VOIDED" || fake.Effects("voids") != 1 {
 		t.Fatalf("void = %d %s", r.status, r.body)
 	}
 	msgs := kafkatest.ReadKeyed(t, topicEvents, id, 3, 60*time.Second)

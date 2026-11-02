@@ -25,7 +25,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	sc.Step(`^checkout completed for session "([^"]*)" as order "([^"]*)"$`,
 		func(session, order string) error { return w.checkoutCompleted(session, order) })
 	sc.Step(`^the authorization is voided$`, func() error {
-		return w.do(http.MethodPost, "/payment-authorizations/"+w.authID+":void", "")
+		return w.do(http.MethodPost, "/payment-authorizations/"+w.authID+"/voids", "")
 	})
 	sc.Step(`^the response status is (\d+)$`, func(want int) error {
 		if w.status != want {

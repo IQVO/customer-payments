@@ -3,11 +3,13 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/IQVO/customer-payments/internal/adapters/outbound/postgres/pgtx"
+	"github.com/IQVO/customer-payments/internal/application/pagination"
 	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/domain/paymentauthorization"
 	"github.com/IQVO/customer-payments/internal/domain/refund"
@@ -70,9 +72,17 @@ func (r *RefundRepository) Get(ctx context.Context, id refund.ID) (*refund.Refun
 	return list[0], nil
 }
 
-// ListByOrder implements ports.RefundRepository.
-func (r *RefundRepository) ListByOrder(ctx context.Context, orderID string) ([]*refund.Refund, error) {
-	return r.find(ctx, false, `WHERE order_id = $1 ORDER BY created_at, refund_id`, orderID)
+// ListByOrder implements ports.RefundRepository: (created_at, refund_id)
+// ascending, strictly after the keyset, at most limit rows. The row comparison
+// walks the refunds_order_idx index.
+func (r *RefundRepository) ListByOrder(ctx context.Context, orderID string, after *pagination.Keyset, limit int) ([]*refund.Refund, error) {
+	clause, args := `WHERE order_id = $1`, []any{orderID}
+	if after != nil {
+		clause += ` AND (created_at, refund_id) > ($2, $3)`
+		args = append(args, after.CreatedAt.UTC(), after.ID)
+	}
+	args = append(args, limit)
+	return r.find(ctx, false, clause+` ORDER BY created_at, refund_id LIMIT $`+strconv.Itoa(len(args)), args...)
 }
 
 // ListByAuthorization implements ports.RefundRepository.

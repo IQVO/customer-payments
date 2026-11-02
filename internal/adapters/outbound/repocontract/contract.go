@@ -40,6 +40,7 @@ func Run(t *testing.T, newEnv func(t *testing.T) Env) {
 		"lookups":        testLookups,
 		"due":            testDueQueries,
 		"refunds":        testRefunds,
+		"pages":          testPages,
 		"parked":         testParked,
 		"inbox":          testInbox,
 		"unitofwork":     testUnitOfWork,

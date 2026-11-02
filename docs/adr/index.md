@@ -19,3 +19,4 @@ immutable; a changed decision gets a new ADR that supersedes the old one. The
 | [0003](/docs/adr/0003-cloudevents-envelope-and-type-catalogue) | CloudEvents envelope and type catalogue | Accepted (2026-10-25). |
 | [0004](/docs/adr/0004-fleet-observability-standard) | Adopt the fleet observability standard (logs, metrics, traces) | Accepted (2026-10-26). |
 | [0005](/docs/adr/0005-a2a-inbound-adapter) | A2A inbound adapter | Accepted (2026-10-30). Follows ADR 0003 (CloudEvents on every Kafka message) and ADR 0004 (the shared telemetry contract); modelled on the read-only MCP adapter of this context. |
+| [0006](/docs/adr/0006-adopt-the-fleet-rest-api-guideline) | Adopt the fleet REST API guideline | Accepted (2026-11-01). Replaces the per-route Idempotency-Key store, the 422 answer for key reuse, the `:void` route and the bare list bodies of ADR 0002's contract. |

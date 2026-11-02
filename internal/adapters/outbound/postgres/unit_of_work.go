@@ -23,7 +23,8 @@ type querier interface {
 // UnitOfWork is the pgx-backed ports.UnitOfWork: Do begins one transaction,
 // carries it in the ctx handed to fn (see package pgtx), commits on a nil
 // return and rolls back otherwise. If ctx already carries a transaction Do
-// joins it instead of beginning a nested one.
+// joins it as a nested unit: a savepoint, so a failing inner unit undoes only
+// its own writes and the retry loops of the use cases start from clean state.
 type UnitOfWork struct{ pool *pgxpool.Pool }
 
 var _ ports.UnitOfWork = (*UnitOfWork)(nil)
@@ -33,8 +34,8 @@ func NewUnitOfWork(pool *pgxpool.Pool) *UnitOfWork { return &UnitOfWork{pool: po
 
 // Do implements ports.UnitOfWork.
 func (u *UnitOfWork) Do(ctx context.Context, fn func(ctx context.Context) error) error {
-	if _, ok := pgtx.From(ctx); ok {
-		return fn(ctx)
+	if outer, ok := pgtx.From(ctx); ok {
+		return nested(ctx, outer, fn)
 	}
 	tx, err := u.pool.Begin(ctx)
 	if err != nil {
@@ -49,6 +50,23 @@ func (u *UnitOfWork) Do(ctx context.Context, fn func(ctx context.Context) error)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit unit of work: %w", err)
+	}
+	return nil
+}
+
+// nested runs fn as a savepoint of outer: released on success, rolled back to
+// on an error or a panic.
+func nested(ctx context.Context, outer pgx.Tx, fn func(ctx context.Context) error) error {
+	sp, err := outer.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin nested unit of work: %w", err)
+	}
+	defer func() { _ = sp.Rollback(context.WithoutCancel(ctx)) }()
+	if err := fn(pgtx.With(ctx, sp)); err != nil {
+		return err
+	}
+	if err := sp.Commit(ctx); err != nil {
+		return fmt.Errorf("release nested unit of work: %w", err)
 	}
 	return nil
 }

@@ -64,14 +64,14 @@ func TestGetAndListAuthorizations(t *testing.T) {
 	for _, q := range []string{"?orderId=ord-1", "?checkoutSessionId=cs-1"} {
 		l := e.get("/payment-authorizations" + q)
 		e.wantStatus(l, http.StatusOK)
-		if got := l.json(t)["authorizations"].([]any); len(got) != 1 {
+		if got := l.json(t)["items"].([]any); len(got) != 1 {
 			t.Fatalf("%s: %s", q, l.Body)
 		}
 	}
 	e.wantProblem(e.get("/payment-authorizations"), http.StatusUnprocessableEntity, "validation-failed")
 	empty := e.get("/payment-authorizations?orderId=ord-9")
 	e.wantStatus(empty, http.StatusOK)
-	if !strings.Contains(empty.Body, `"authorizations":[]`) {
+	if !strings.Contains(empty.Body, `"items":[]`) {
 		t.Fatalf("empty list = %s", empty.Body)
 	}
 }
@@ -79,22 +79,22 @@ func TestGetAndListAuthorizations(t *testing.T) {
 func TestVoidRoute(t *testing.T) {
 	e := newEnv(t)
 	id := e.authorized()
-	r := e.post("/payment-authorizations/"+id+":void", "")
+	r := e.post("/payment-authorizations/"+id+"/voids", "")
 	e.wantStatus(r, http.StatusOK)
 	if r.json(t)["state"] != "VOIDED" {
 		t.Fatalf("body = %s", r.Body)
 	}
-	e.wantProblem(e.post("/payment-authorizations/"+id+":void", ""), http.StatusConflict, "illegal-transition")
-	e.wantProblem(e.post("/payment-authorizations/nope:void", ""), http.StatusNotFound, "not-found")
+	e.wantProblem(e.post("/payment-authorizations/"+id+"/voids", ""), http.StatusConflict, "illegal-transition")
+	e.wantProblem(e.post("/payment-authorizations/nope/voids", ""), http.StatusNotFound, "not-found")
 }
 
 func TestVoidProviderOutageIs503(t *testing.T) {
 	e := newEnv(t)
 	id := e.authorized()
 	e.provider.Fail("void", errors.New("x"))
-	e.wantStatus(e.post("/payment-authorizations/"+id+":void", ""), http.StatusInternalServerError)
+	e.wantStatus(e.post("/payment-authorizations/"+id+"/voids", ""), http.StatusInternalServerError)
 	e.provider.Fail("void", errUnavailable)
-	e.wantProblem(e.post("/payment-authorizations/"+id+":void", ""), http.StatusServiceUnavailable, "payment-provider-unavailable")
+	e.wantProblem(e.post("/payment-authorizations/"+id+"/voids", ""), http.StatusServiceUnavailable, "payment-provider-unavailable")
 }
 
 func TestRefundRoutes(t *testing.T) {
@@ -111,7 +111,7 @@ func TestRefundRoutes(t *testing.T) {
 	e.wantStatus(g, http.StatusOK)
 	l := e.get("/refunds?orderId=ord-1")
 	e.wantStatus(l, http.StatusOK)
-	if got := l.json(t)["refunds"].([]any); len(got) != 1 {
+	if got := l.json(t)["items"].([]any); len(got) != 1 {
 		t.Fatalf("list = %s", l.Body)
 	}
 	e.wantProblem(e.get("/refunds"), http.StatusUnprocessableEntity, "validation-failed")
