@@ -35,9 +35,10 @@ it here as a hard cutover: no alias route, no dual header, no toggle.
    | Old | New |
    |---|---|
    | `POST /payment-authorizations/{authorizationId}:void` | `POST /payment-authorizations/{authorizationId}/voids` |
+   | `POST /refunds/{refundId}:retry` | `POST /refunds/{refundId}/retries` |
 
    `TestRetiredRoutesAreGone` asserts the old route answers 404 or 405.
-2. **Idempotency (R3-R6, R8).** Every `POST` (`/payment-authorizations`, `.../voids`, `/refunds`, `/refunds/{refundId}:retry`)
+2. **Idempotency (R3-R6, R8).** Every `POST` (`/payment-authorizations`, `.../voids`, `/refunds`, `/refunds/{refundId}/retries`)
    sits behind `RequireIdempotencyKey(store, clock)`, applied per route; there is no `PUT`, `PATCH` or `DELETE`
    route. The key is 1 to 128 printable ASCII characters: absent is 400 `idempotency-key-required`, malformed
    is 400 `idempotency-key-invalid` (a key longer than 128 characters used to be reported as `-required`). The
@@ -86,12 +87,16 @@ None. `GET /payment-authorizations` and `GET /refunds` are the only collections 
 `GET /payment-authorizations/{authorizationId}`, `GET /refunds/{refundId}`, `/healthz`, `/readyz` and `/metrics`
 are not collections.
 
-### Open question
+### Amendment: `:retry` becomes `/retries`
 
-`POST /refunds/{refundId}:retry` (use case `RetryRefund`) is served by the router and sits behind the
-`Idempotency-Key` middleware, but it is not in `apis/openapi.yaml` and not in the fleet rename map, so the
-Spectral rule cannot see it and it keeps its `:retry` spelling. STANDARD 1.4 has no transition noun for
-"retry"; naming one (and adding the route to the spec) is a fleet decision, not taken here.
+`POST /refunds/{refundId}:retry` (use case `RetryRefund`) was the last `:verb` route in the fleet. It was
+served by the router but missing from `apis/openapi.yaml`, so the Spectral rule never saw it. It is now
+`POST /refunds/{refundId}/retries` (rule 1.3 d: a lifecycle transition is a transition resource, here the
+plural noun `retries`), described in the spec as operation `retryRefund` with the `Idempotency-Key` parameter,
+`200` (with `Idempotency-Replayed`), `400`, `404`, `409` (illegal-transition, concurrent-update or
+idempotency-key-reused) and `500`. Behaviour, status codes and body are unchanged; hard cutover, no alias.
+`TestRetiredRoutesAreGone` now also asserts that `POST /refunds/{refundId}:retry` answers 404 or 405. The
+only caller known is storefront ops (no consumer in this repository or in the other fleet repos).
 
 ## Consequences
 

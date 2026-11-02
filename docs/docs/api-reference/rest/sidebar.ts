@@ -66,6 +66,12 @@ const sidebar: SidebarsConfig = {
           label: "Get one refund",
           className: "api-method get",
         },
+        {
+          type: "doc",
+          id: "api-reference/rest/retry-refund",
+          label: "Retry a failed refund (ops only)",
+          className: "api-method post",
+        },
       ],
     },
   ],

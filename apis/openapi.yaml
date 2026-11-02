@@ -31,13 +31,7 @@ info:
     idempotency-key-reused. A body that is not one JSON object of the declared
     fields (unknown field, trailing data, over 64 KiB, a NUL character) is 400
     malformed-request; a NUL character in a path is 404 resource-not-found.
-    Not described under paths because the fleet REST ruleset (R1) rejects a
-    custom-method suffix: the service also serves POST /refunds/{refundId}:retry
-    (RetryRefund, ops only, Idempotency-Key required, no body), which moves a
-    FAILED refund back to REQUESTED, tries the provider once more (at most 5
-    attempts) and answers 200 with the Refund; 404 not-found, 409
-    illegal-transition (not FAILED, or attempts used), concurrent-update or
-    idempotency-key-reused, and the usual 400s. Any operation can answer 500
+    Any operation can answer 500
     internal-error. The two collection reads are keyset-paged ({items, nextCursor}; invalid-limit,
     invalid-cursor and unknown-query-parameter are 400). No authentication.
 servers:
@@ -311,6 +305,43 @@ paths:
                 $ref: '#/components/schemas/Refund'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /refunds/{refundId}/retries:
+    post:
+      tags: [Refunds]
+      operationId: retryRefund
+      summary: Retry a failed refund (ops only)
+      description: >-
+        RetryRefund, the ops route; no request body. Moves a FAILED refund back
+        to REQUESTED and tries the provider once more, at most 5 attempts in
+        all. The answer is 200 with the Refund as it stands after that attempt
+        (SUCCEEDED, FAILED again with failureCode, or still REQUESTED when the
+        provider is unreachable); it is never 503. A refund that is not FAILED,
+        or whose attempts are used up, is 409 illegal-transition.
+      parameters:
+        - $ref: '#/components/parameters/RefundId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The refund after the retry attempt.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: illegal-transition (the refund is not FAILED, or its 5 attempts are used), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '500':
           $ref: '#/components/responses/InternalError'
 components:

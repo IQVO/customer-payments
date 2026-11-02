@@ -1,0 +1,70 @@
+---
+id: retry-refund
+title: "Retry a failed refund (ops only)"
+description: "RetryRefund, the ops route; no request body. Moves a FAILED refund back to REQUESTED and tries the provider once more, at most 5 attempts in all. The answer is 200 with the Refund as it stands after that attempt (SUCCEEDED, FAILED again with failureCode, or still REQUESTED when the provider is unreachable); it is never 503. A refund that is not FAILED, or whose attempts are used up, is 409 illegal-transition."
+sidebar_label: "Retry a failed refund (ops only)"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/customer-payments-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Retry a failed refund (ops only)"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/refunds/{refundId}/retries"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+RetryRefund, the ops route; no request body. Moves a FAILED refund back to REQUESTED and tries the provider once more, at most 5 attempts in all. The answer is 200 with the Refund as it stands after that attempt (SUCCEEDED, FAILED again with failureCode, or still REQUESTED when the provider is unreachable); it is never 503. A refund that is not FAILED, or whose attempts are used up, is 409 illegal-transition.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./retry-refund.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./retry-refund.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./retry-refund.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

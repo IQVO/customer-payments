@@ -146,7 +146,7 @@ func (d Deps) auditManualRefund(ctx context.Context, f *refund.Refund) {
 	)
 }
 
-// RetryRefund is the command RetryRefund (POST /refunds/{refundId}:retry, H8).
+// RetryRefund is the command RetryRefund (POST /refunds/{refundId}/retries, H8).
 type RetryRefund struct{ Deps }
 
 // Execute moves a FAILED refund back to REQUESTED and tries the provider.

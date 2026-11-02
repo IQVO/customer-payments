@@ -26,7 +26,7 @@ adapter maps them to problem slugs ([API overview](/docs/api-reference)).
 | `VoidAuthorization` | checkout; policy `VoidUnboundAuthorizations` | `POST /payment-authorizations/{authorizationId}/voids`; policy loop | `PaymentReleased` (reason `VOIDED`, one per allocation) |
 | `GetAuthorization`, `ListAuthorizations` | checkout, ops, MCP, A2A | `GET /payment-authorizations...`, MCP, A2A | none |
 | `RequestRefund` | storefront ops | `POST /refunds` | `RefundIssued` or `RefundFailed` |
-| `RetryRefund` | storefront ops | `POST /refunds/{refundId}:retry` | `RefundIssued` or `RefundFailed` |
+| `RetryRefund` | storefront ops | `POST /refunds/{refundId}/retries` | `RefundIssued` or `RefundFailed` |
 | `GetRefund`, `ListRefunds` | ops, MCP, A2A | `GET /refunds...`, MCP, A2A | none |
 | `Consumer.CheckoutCompleted` (bind) | `CheckoutCompleted` | Kafka `retailnetwork.checkout.events` | none itself; applies parked facts |
 | `Consumer.ApplyFact`: capture | `FulfillmentShipped` | Kafka `retailnetwork.order-sourcing.events` | `PaymentCaptured` |

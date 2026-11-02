@@ -14,7 +14,7 @@ import (
 // carries the SAME read use cases the REST adapter uses (GET
 // /payment-authorizations, /payment-authorizations/{id}, /refunds,
 // /refunds/{id}); it holds no write use case at all: POST /payment-authorizations,
-// POST .../voids, POST /refunds and :retry stay REST-only.
+// POST .../voids, POST /refunds and POST /refunds/{refundId}/retries stay REST-only.
 type Deps struct {
 	GetAuthorization   *usecases.GetAuthorization
 	ListAuthorizations *usecases.ListAuthorizations

@@ -53,7 +53,7 @@ PSP tokens.
   Kafka events, never by REST writes; partial release shrinks the provider hold.
 - **Refund** lost or returned packages automatically, or on request
   (`POST /refunds`), with retry of failed refunds
-  (`POST /refunds/{refundId}:retry`) and an alert when the fifth attempt fails.
+  (`POST /refunds/{refundId}/retries`) and an alert when the fifth attempt fails.
 - **Re-authorize** before expiry; a provider decline expires the authorization
   and raises `PaymentDeclined` with reason `REAUTH_DECLINED`.
 - **Publish** every decision through a transactional outbox as CloudEvents 1.0.

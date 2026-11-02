@@ -11,6 +11,8 @@ func TestRetiredRoutesAreGone(t *testing.T) {
 	e := newEnv(t)
 	id := e.authorized()
 	for _, c := range []struct{ method, path string }{
+		{http.MethodPost, "/refunds/rf-1:retry"},
+		{http.MethodPost, "/refunds/{refundId}:retry"},
 		{http.MethodPost, "/payment-authorizations/" + id + ":void"},
 		{http.MethodPost, "/payment-authorizations/{authorizationId}:void"},
 	} {
