@@ -187,8 +187,8 @@ func (d Deps) listRefunds(ctx context.Context, in listRefundsInput) (refundList,
 // (L1 here: the surface is read-only, docs/adr/0007); TestToolSurface pins
 // the set and fails the build on any write-verb name.
 func (d Deps) registerTools(server *mcp.Server) {
+	readOnly := true
 	closedWorld := false
-	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld}
 
 	addTool(server, &mcp.Tool{
 		Name: "get_payment_authorization",
@@ -196,27 +196,27 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"EXPIRED or DECLINED), the checkout session and order it belongs to, the currency and total in minor units, every " +
 			"allocation per shipment group (groupNo, amountMinor, PENDING, CAPTURED or RELEASED, tracking numbers) and when the hold expires. " +
 			"Read-only; an unknown id fails with not-found.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.getPaymentAuthorization)
 	addTool(server, &mcp.Tool{
 		Name: "list_payment_authorizations",
 		Description: "List the payment authorizations of one order (orderId) or of one checkout session (checkoutSessionId, declined " +
 			"attempts included), oldest first, at most 1000. Give exactly one of the two. Read-only.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.listPaymentAuthorizations)
 	addTool(server, &mcp.Tool{
 		Name: "get_refund",
 		Description: "Read one refund by id: its state (REQUESTED, SUCCEEDED or FAILED), reason (LOST, RETURNED_TO_SENDER or MANUAL), " +
 			"order, group, amount in minor units, how many provider attempts were made and the last failure code. Read-only; an unknown id fails with not-found.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.getRefund)
 	addTool(server, &mcp.Tool{
 		Name:        "list_refunds",
 		Description: "List the refunds of one order, oldest first, at most 1000. Read-only.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.listRefunds)
 }
