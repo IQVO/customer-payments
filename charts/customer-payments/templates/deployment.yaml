@@ -92,6 +92,12 @@ spec:
             - name: SHUTDOWN_DRAIN_DELAY
               value: {{ .Values.config.shutdownDrainDelay | quote }}
             {{- end }}
+            # The ops kill switch of POST /refunds: unset = enabled (the
+            # binary's default), "false"/"0" = the route answers 503.
+            {{- if ne (toString .Values.config.refundsEnabled) "" }}
+            - name: REFUNDS_ENABLED
+              value: {{ .Values.config.refundsEnabled | quote }}
+            {{- end }}
             # Observability env (ADR 0004): the same three for every
             # component, plus ENVIRONMENT for deployment.environment.name.
             - name: ENVIRONMENT

@@ -22,7 +22,7 @@ base=(--set database.url=postgres://u@example.invalid:5432/db
 for g in "${groups[@]}"; do base+=(--set "config.${g%%:*}=${g#*:}"); done
 # Every optional value set, so every env var cmd/api can read is rendered.
 everything=(--set config.outboxRelayInterval=2s --set config.policyInterval=3s
-  --set config.shutdownDrainDelay=5s --set database.migrationsUrl=postgres://u@example.invalid:5432/direct
+  --set config.shutdownDrainDelay=5s --set config.refundsEnabled=false --set database.migrationsUrl=postgres://u@example.invalid:5432/direct
   --set autoscaling.api.enabled=true --set ingress.enabled=true --set gatewayApi.enabled=true)
 
 fail() { echo "FAIL: $*" >&2; exit 1; }

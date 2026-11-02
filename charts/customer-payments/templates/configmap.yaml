@@ -30,3 +30,6 @@ data:
   {{- if ne (toString .Values.config.shutdownDrainDelay) "" }}
   SHUTDOWN_DRAIN_DELAY: {{ .Values.config.shutdownDrainDelay | quote }}
   {{- end }}
+  {{- if ne (toString .Values.config.refundsEnabled) "" }}
+  REFUNDS_ENABLED: {{ .Values.config.refundsEnabled | quote }}
+  {{- end }}
