@@ -83,6 +83,6 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.With(idempotent).Post("/refunds", s.handleRequestRefund)
 	r.Get("/refunds", s.handleListRefunds)
 	r.Get("/refunds/{refundId}", s.handleGetRefund)
-	r.With(idempotent).Post("/refunds/{refundId}:retry", s.handleRetryRefund)
+	r.With(idempotent).Post("/refunds/{refundId}/retries", s.handleRetryRefund)
 	return r
 }

@@ -35,8 +35,8 @@ under *Spec versus code* below.
 | Authorizations | `POST /payment-authorizations/{authorizationId}/voids` | `voidPaymentAuthorization` | `200`, state `VOIDED`, allocations `RELEASED`; `409 illegal-transition` after a capture | yes |
 | Refunds | `POST /refunds` | `requestRefund` | `201`, the refund (possibly still `REQUESTED` after a provider outage); body `orderId`, `amountMinor`, `reason` (`LOST`, `RETURNED_TO_SENDER`, `MANUAL`), optional `groupNo` (default 0 = order level) | yes (without `groupNo`) |
 | Refunds | `GET /refunds?orderId=` | `listRefunds` | `200 {items: [...], nextCursor}`, oldest first, keyset-paged by `limit` and `cursor`; `orderId` required; `400` `invalid-limit`, `invalid-cursor`, `unknown-query-parameter` | yes |
-| Refunds | `GET /refunds/{refundId}` | none | `200`; `404 not-found` | **no** |
-| Refunds | `POST /refunds/{refundId}:retry` | none | `200`; moves a `FAILED` refund back to `REQUESTED` and tries the provider again (at most 5 attempts in all) | **no** |
+| Refunds | `GET /refunds/{refundId}` | `getRefund` | `200`; `404 not-found` | yes |
+| Refunds | `POST /refunds/{refundId}/retries` | `retryRefund` | `200`; moves a `FAILED` refund back to `REQUESTED` and tries the provider again (at most 5 attempts in all); `404`, `409` | yes |
 | Health | `GET /healthz` | none | `200 {"status":"ok"}` | no |
 | Health | `GET /readyz` | none | `200 {"status":"ready"}`, or `503` (`dependency-unavailable` naming `postgres` / `kafka`, or `{"status":"not_ready"}` while draining) | no |
 | Metrics | `GET /metrics` | none | Prometheus text, one gauge `customer_payments_parked_facts` | no |
@@ -99,6 +99,5 @@ change):
 | --- | --- | --- |
 | `POST /payment-authorizations` for a session with a live authorization | `200` (existing authorization), `201`, `400`, `409`, `422`, `503` | the `200` with the existing authorization (`internal/adapters/inbound/http/handlers.go`, `handleAuthorize`) is documented; a repeat with a *different* key returns the existing one rather than `409 duplicate-authorization` |
 | Authorization `state` enum | `AUTHORIZED`, `PARTIALLY_CAPTURED`, `CAPTURED`, `VOIDED`, `EXPIRED`, `DECLINED` | also `RELEASED` (every allocation released by cancellation; the database `CHECK` and the domain allow it) |
-| `GET /refunds/{refundId}`, `POST /refunds/{refundId}:retry` | absent | served by the router; `:retry` keeps its colon spelling and is not in the spec, so the Spectral `rest-guideline` rule cannot see it (open question in [ADR 0006](/docs/adr/0006-adopt-the-fleet-rest-api-guideline)); it sits behind the Idempotency-Key middleware like every other `POST` |
 | Refund body `groupNo`; refund response `authorizationId`, `groupNo`, `attempts`, `failureCode`, `providerRefundId` | absent from `RefundRequest` / `Refund` | accepted and returned (`internal/adapters/inbound/http/dto.go`) |
 | `/healthz`, `/readyz`, `/metrics` | absent | served by the router |

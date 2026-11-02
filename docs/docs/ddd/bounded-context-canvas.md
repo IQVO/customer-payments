@@ -83,7 +83,7 @@ bound.
 | checkout | `AuthorizePayment` | command | REST `POST /payment-authorizations` | Customer/Supplier (we supply) |
 | checkout | `VoidAuthorization` | command | REST `POST /payment-authorizations/{authorizationId}/voids` | Customer/Supplier |
 | checkout, ops | `GetAuthorization`, `ListAuthorizations` | query | REST `GET /payment-authorizations...` | Customer/Supplier, UI |
-| ops | `RequestRefund`, `RetryRefund` | command | REST `POST /refunds`, `POST /refunds/{refundId}:retry` | UI |
+| ops | `RequestRefund`, `RetryRefund` | command | REST `POST /refunds`, `POST /refunds/{refundId}/retries` | UI |
 | ops | `GetRefund`, `ListRefunds` | query | REST `GET /refunds...` | UI |
 | agents | four MCP tools, two A2A skills | query | `cmd/mcp`, `cmd/a2a` | UI |
 | checkout | `CheckoutCompleted` | event | Kafka `retailnetwork.checkout.events`, `com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted` | Customer/Supplier (we consume) |

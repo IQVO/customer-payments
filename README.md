@@ -177,7 +177,7 @@ Routes served by `cmd/api`:
 | `POST` | `/refunds` | Request a refund (Idempotency-Key) |
 | `GET` | `/refunds` | List refunds of an order (`limit`, `cursor`) |
 | `GET` | `/refunds/{refundId}` | Get one refund |
-| `POST` | `/refunds/{refundId}:retry` | Retry a failed refund (Idempotency-Key) |
+| `POST` | `/refunds/{refundId}/retries` | Retry a failed refund (Idempotency-Key) |
 | `GET` | `/healthz`, `/readyz`, `/metrics` | Liveness, readiness (gates on Postgres+Kafka), the parked-facts gauge |
 
 ## Helm chart
