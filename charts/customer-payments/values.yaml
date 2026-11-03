@@ -126,6 +126,10 @@ config:
   # Empty = not rendered (the binary defaults to 5s). Whole seconds ("5s"),
   # minutes ("1m") or "0"; the chart needs the number to size the grace period.
   shutdownDrainDelay: ""
+  # REFUNDS_ENABLED: the ops kill switch of POST /refunds. Empty = not rendered
+  # (the binary defaults to enabled); "false"/"0" = the route answers 503
+  # refunds-disabled. Anything else warns and keeps the route enabled.
+  refundsEnabled: ""
 
 # The chart refuses to render unless database.url or database.existingSecret is
 # set. DATABASE_URL always comes from a Secret (secretKeyRef), never from the

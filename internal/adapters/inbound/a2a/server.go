@@ -36,6 +36,9 @@ import (
 	"github.com/IQVO/customer-payments/internal/application/usecases"
 )
 
+// mediaJSON is the one content type this agent speaks on every mode list.
+const mediaJSON = "application/json"
+
 // Config carries the deployment-specific identity of this agent: the absolute
 // URL clients use to reach its JSON-RPC endpoint (advertised on the Agent
 // Card) and the card version. It is supplied by the composition root from
@@ -90,16 +93,16 @@ func Card(cfg Config) *a2a.AgentCard {
 		SupportedInterfaces: []*a2a.AgentInterface{
 			a2a.NewAgentInterface(cfg.AgentURL, a2a.TransportProtocolJSONRPC),
 		},
-		DefaultInputModes:  []string{"application/json", "text/plain"},
-		DefaultOutputModes: []string{"application/json", "text/plain"},
+		DefaultInputModes:  []string{mediaJSON, "text/plain"},
+		DefaultOutputModes: []string{mediaJSON, "text/plain"},
 		Capabilities:       a2a.AgentCapabilities{Streaming: false},
 		Skills: []a2a.AgentSkill{
 			{
 				ID:          skillGetPaymentStatus,
 				Name:        "Where does a payment stand",
 				Description: "Read the payment authorizations of one checkout session or one order, or one authorization by id. Give exactly one of authorizationId, orderId and checkoutSessionId. Each authorization carries its state (AUTHORIZED, PARTIALLY_CAPTURED, CAPTURED, RELEASED, VOIDED, EXPIRED or DECLINED), the checkout session and order it belongs to, the currency and total in minor units, every allocation per shipment group (groupNo, amountMinor, PENDING, CAPTURED or RELEASED, tracking numbers), when the hold expires and the decline reason. A checkout session lists declined attempts too. An unknown authorizationId answers a 404 problem; an order or session with no authorization answers an empty list. Persists nothing and returns no card data.",
-				Tags:        []string{"payment", "authorization", "read"},
-				InputModes:  []string{"application/json"},
+				Tags:        []string{"payment", "authorization", "read", "authority:L1"},
+				InputModes:  []string{mediaJSON},
 				Examples: []string{
 					`{"skill":"get_payment_status","arguments":{"orderId":"ord-1"}}`,
 					`{"skill":"get_payment_status","arguments":{"checkoutSessionId":"cs-1"}}`,
@@ -110,8 +113,8 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillGetRefundStatus,
 				Name:        "How did a refund go",
 				Description: "Read the refunds of one order (oldest first), or one refund by id. Give exactly one of refundId and orderId. Each refund carries its state (REQUESTED, SUCCEEDED or FAILED), reason (LOST, RETURNED_TO_SENDER or MANUAL), order, authorization, group, amount in minor units, how many provider attempts were made and the last failure code. An unknown refundId answers a 404 problem; an order with no refund answers an empty list. Persists nothing; it never requests or retries a refund.",
-				Tags:        []string{"payment", "refund", "read"},
-				InputModes:  []string{"application/json"},
+				Tags:        []string{"payment", "refund", "read", "authority:L1"},
+				InputModes:  []string{mediaJSON},
 				Examples: []string{
 					`{"skill":"get_refund_status","arguments":{"orderId":"ord-1"}}`,
 					`{"skill":"get_refund_status","arguments":{"refundId":"ref-3f9c1a2b4d5e"}}`,

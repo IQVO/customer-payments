@@ -19,6 +19,11 @@ const problemBase = "/problems/"
 // (bad JSON, unknown field, wrong type).
 var errMalformedRequest = errors.New("request is not valid for this operation")
 
+// errRefundsDisabled marks POST /refunds while the ops kill switch
+// REFUNDS_ENABLED=false is set: the route answers 503 refunds-disabled
+// instead of creating a manual refund (portfolio rec 2026-11-02).
+var errRefundsDisabled = errors.New("manual refunds are disabled by configuration")
+
 // problem is the fixed (status, slug, title) of one error category; the detail
 // comes from the error at write time.
 type problem struct {
@@ -53,6 +58,7 @@ var problemCatalogue = []struct {
 	p   problem
 }{
 	{errMalformedRequest, problem{http.StatusBadRequest, "malformed-request", "Malformed request"}},
+	{errRefundsDisabled, problem{http.StatusServiceUnavailable, "refunds-disabled", "Manual refunds are disabled by configuration"}},
 	{page.ErrInvalidLimit, problem{http.StatusBadRequest, "invalid-limit", "limit must be an integer between 1 and 500"}},
 	{page.ErrInvalidCursor, problem{http.StatusBadRequest, "invalid-cursor", "cursor is not a valid page token"}},
 	{errUnknownQueryParameter, problem{http.StatusBadRequest, "unknown-query-parameter", "The collection does not declare this query parameter"}},

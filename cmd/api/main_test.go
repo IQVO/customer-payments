@@ -190,3 +190,24 @@ func TestServeUntilSignalReturnsAListenError(t *testing.T) {
 		t.Fatal("binding a taken port must fail")
 	}
 }
+
+func TestRefundsEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want bool
+	}{
+		{"", true},
+		{"true", true},
+		{"1", true},
+		{"TRUE", true},
+		{"false", false},
+		{"0", false},
+		{" False ", false},
+		{"yes", true}, // invalid: stays enabled, never silently off
+	} {
+		env := func(string) string { return tc.raw }
+		if got := refundsEnabled(env, quiet()); got != tc.want {
+			t.Errorf("REFUNDS_ENABLED=%q = %v, want %v", tc.raw, got, tc.want)
+		}
+	}
+}

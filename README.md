@@ -52,7 +52,7 @@ internal/
   adapters/
     inbound/http/            chi handlers, RFC 9457 problem mapping, idempotency middleware
     inbound/kafka/           checkout, order-sourcing, shipping-and-tracking consumers
-    inbound/mcp/             the four read-only MCP tools
+    inbound/mcp/             the four read-only MCP tools (each declares its authority level, ADR 0007), one scoped resource and one operator SOP prompt
     inbound/a2a/             the two read-only A2A skills
     inbound/requestlog/      the request log line
     kafka/cloudevents/       the CloudEvents 1.0 codec (structured content mode)
@@ -72,7 +72,7 @@ features/                    godog scenarios (authorization, capture_release, re
 charts/customer-payments/    the Helm chart
 ```
 
-The layering is an executable test, not a convention: `internal/architecture/architecture_test.go` (`TestHexagonalArchitecture`) fails the build if the domain ever imports an outer layer or an adapter reaches sideways into a sibling. The same package pins the rest of the shape: CloudEvents-only envelopes and the event catalogue (`catalogue_fitness_test.go`, `events_fitness_test.go`), Kafka DLQ/acks/topic rules (`kafka_*_fitness_test.go`), the outbox relay attempt cap (`outbox_relay_cap_fitness_test.go`), `runtime_no_memory_fitness_test.go` (no in-memory adapter in any binary), and the read-only MCP/A2A surfaces (`mcp_optional_inputs_test.go`, `a2a_fitness_test.go`).
+The layering is an executable test, not a convention: `internal/architecture/architecture_test.go` (`TestHexagonalArchitecture`) fails the build if the domain ever imports an outer layer or an adapter reaches sideways into a sibling. The same package pins the rest of the shape: CloudEvents-only envelopes and the event catalogue (`catalogue_fitness_test.go`, `events_fitness_test.go`), Kafka DLQ/acks/topic rules (`kafka_*_fitness_test.go`), the outbox relay attempt cap (`outbox_relay_cap_fitness_test.go`), `runtime_no_memory_fitness_test.go` (no in-memory adapter in any binary), and the read-only MCP/A2A surfaces (`mcp_optional_inputs_test.go`, `a2a_fitness_test.go`, plus the agent-authority sensor `mcp_authority_fitness_test.go`: every MCP tool and A2A skill declares exactly one authority level L1..L4 and every MCP server offers a resource and a prompt, ADR 0007).
 
 ## Domain events
 
@@ -126,6 +126,7 @@ go run ./cmd/api        # migrations run at boot; REST on :8080, /readyz gates o
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Relay poll interval (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row (`0` = unlimited) |
 | `POLICY_INTERVAL` | `5s` | Clock-driven policy pass interval (re-authorization) |
+| `REFUNDS_ENABLED` | `true` | Ops kill switch of `POST /refunds`: `false`/`0` = the route answers 503 `refunds-disabled` |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait after flipping `/readyz` before closing |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `OTEL_SERVICE_NAME` | `customer-payments` | `service.name` of spans and metrics |

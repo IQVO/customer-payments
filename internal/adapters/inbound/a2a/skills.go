@@ -27,6 +27,13 @@ const (
 	skillGetRefundStatus  = "get_refund_status"
 )
 
+// Selector names of the read skills' arguments, as they also appear in the
+// problem detail of a failed choice.
+const (
+	selAuthorizationID = "authorizationId"
+	selRefundID        = "refundId"
+)
+
 // maxIDLength mirrors the REST and MCP adapters' id guard.
 const maxIDLength = 128
 
@@ -192,7 +199,7 @@ func (d Deps) getPaymentStatus(ctx context.Context, rawArgs json.RawMessage) (au
 		return authorizationListDTO{}, problemMalformedRequest(fmt.Sprintf("arguments: %v", err))
 	}
 	sel, problem := chooseSelector(
-		selector{"authorizationId", args.AuthorizationID},
+		selector{selAuthorizationID, args.AuthorizationID},
 		selector{"orderId", args.OrderID},
 		selector{"checkoutSessionId", args.CheckoutSessionID},
 	)
@@ -204,7 +211,7 @@ func (d Deps) getPaymentStatus(ctx context.Context, rawArgs json.RawMessage) (au
 	}
 
 	out := authorizationListDTO{Authorizations: []authorizationDTO{}}
-	if sel.name == "authorizationId" {
+	if sel.name == selAuthorizationID {
 		v, err := d.GetAuthorization.Execute(ctx, sel.value)
 		if err != nil {
 			return authorizationListDTO{}, problemFromUseCase(err, fmt.Sprintf("no payment authorization exists with authorizationId %q", sel.value))
@@ -234,7 +241,7 @@ func (d Deps) getRefundStatus(ctx context.Context, rawArgs json.RawMessage) (ref
 	if err := decodeStrict(rawArgs, &args); err != nil {
 		return refundListDTO{}, problemMalformedRequest(fmt.Sprintf("arguments: %v", err))
 	}
-	sel, problem := chooseSelector(selector{"refundId", args.RefundID}, selector{"orderId", args.OrderID})
+	sel, problem := chooseSelector(selector{selRefundID, args.RefundID}, selector{"orderId", args.OrderID})
 	if problem != nil {
 		return refundListDTO{}, problem
 	}
@@ -243,7 +250,7 @@ func (d Deps) getRefundStatus(ctx context.Context, rawArgs json.RawMessage) (ref
 	}
 
 	out := refundListDTO{Refunds: []refundDTO{}}
-	if sel.name == "refundId" {
+	if sel.name == selRefundID {
 		v, err := d.GetRefund.Execute(ctx, sel.value)
 		if err != nil {
 			return refundListDTO{}, problemFromUseCase(err, fmt.Sprintf("no refund exists with refundId %q", sel.value))
@@ -265,7 +272,7 @@ func (d Deps) getRefundStatus(ctx context.Context, rawArgs json.RawMessage) (ref
 // adapters, a resource id over the guard length is a miss (404), not a server
 // error; a listing key over it is a malformed request.
 func tooLong(sel selector) *problem {
-	if sel.name == "authorizationId" || sel.name == "refundId" {
+	if sel.name == selAuthorizationID || sel.name == selRefundID {
 		return problemNotFound(fmt.Sprintf("an id is 1 to %d characters; this %s cannot name a resource", maxIDLength, sel.name))
 	}
 	return problemMalformedRequest(fmt.Sprintf("%s is at most %d characters", sel.name, maxIDLength))

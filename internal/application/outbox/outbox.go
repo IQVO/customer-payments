@@ -45,11 +45,11 @@ type Encoder interface {
 	Encode(events ...shared.Event) ([]Message, error)
 }
 
-// SendFailure is the error a relay store's Drain returns when send failed for
+// SendFailureError is the error a relay store's Drain returns when send failed for
 // one row: the pass stopped there, the failure was recorded on the row and
 // Attempts is the row's failure count AFTER this one (0 when recording it
 // failed too).
-type SendFailure struct {
+type SendFailureError struct {
 	RowID    int64
 	Message  Message
 	Attempts int
@@ -57,9 +57,9 @@ type SendFailure struct {
 }
 
 // Error keeps the "outbox row <id> (<type>): <cause>" wording runbooks grep for.
-func (f *SendFailure) Error() string {
+func (f *SendFailureError) Error() string {
 	return fmt.Sprintf("outbox row %d (%s): %v", f.RowID, f.Message.EventType, f.Err)
 }
 
 // Unwrap exposes the send error.
-func (f *SendFailure) Unwrap() error { return f.Err }
+func (f *SendFailureError) Unwrap() error { return f.Err }
