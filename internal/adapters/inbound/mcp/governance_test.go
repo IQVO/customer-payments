@@ -118,6 +118,11 @@ func checkToolMetadata(t *testing.T, tool *sdk.Tool) {
 	if tool.Annotations.DestructiveHint != nil && *tool.Annotations.DestructiveHint {
 		t.Errorf("tool %q is annotated destructive", tool.Name)
 	}
+	// Agentic Standard v2, AS-1 (docs/adr/0007): the surface is read-only, so
+	// every tool declares exactly L1; the golden pins the wire form.
+	if got := tool.Meta[authorityKey]; got != "L1" {
+		t.Errorf("tool %q declares %s = %q, want %q (a read-only surface is L1)", tool.Name, authorityKey, got, "L1")
+	}
 }
 
 func checkToolArguments(t *testing.T, tool *sdk.Tool) {

@@ -116,6 +116,19 @@ already-lived incident, not a hypothetical:
   2026-10, D16). A field whose `jsonschema` description says "optional" must
   carry `omitempty`. Skips when the service has no
   `internal/adapters/inbound/mcp`.
+- **TestEveryMCPToolDeclaresAuthority / TestMCPWriteToolsAreAtLeastL3 /
+  TestA2ASkillsDeclareAuthority / TestMCPServerOffersResourceAndPrompt**
+  (`mcp_authority_fitness_test.go`, + the sensors' own bite tests) — Agentic
+  Standard v2, AS-1/AS-3 (ADR 0007): every `mcp.Tool` literal declares
+  exactly one authority level L1..L4 via `Meta: authorityMeta(authorityLn)`
+  (or a readable literal), every `a2a.AgentSkill` carries its `authority:L<n>`
+  tag, a level may not contradict the read-only annotations (L4 additionally
+  needs an `//authority:L4 <adr>` comment), and the MCP adapter must call
+  `AddResource`/`AddResourceTemplate` and `AddPrompt` at least once (a repo
+  not yet rolled parks that check with
+  `internal/adapters/inbound/mcp/.agent-surface-pending`). Static go/ast,
+  copied verbatim from the template (PR 47, UNMANAGED). Skips when the
+  service has no MCP/A2A adapter.
 - **TestOutboxRelaysPassAttemptCap** (`outbox_relay_cap_fitness_test.go`,
   + `TestOutboxRelayCapSensorFailsOnBadFixtures`,
   `TestOutboxRelayDeclarationDetector`) — inventory-storage's relay had no
