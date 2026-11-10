@@ -1,3 +1,10 @@
+---
+paths:
+  - "internal/adapters/**/kafka/**"
+  - "internal/adapters/outbound/events/**"
+  - "apis/asyncapi*"
+---
+
 # Cross-service integration events (Kafka)
 
 This service PUBLISHES eight events to `retailnetwork.customer-payments.events` and CONSUMES
