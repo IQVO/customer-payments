@@ -223,6 +223,48 @@ jobs:
         run: python3 scripts/harness/red_issue.py mutation --close
 
   # ============================================================
+  # CLASSIFICATION: CONTINUOUS DRIFT (advisory, weekly — never blocks a PR)
+  # ============================================================
+  drift:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+      - name: Dead code (go tool deadcode, -test so test-only helpers don't false-positive)
+        run: |
+          go install golang.org/x/tools/cmd/deadcode@v0.35.0
+          echo "### deadcode" >> "$GITHUB_STEP_SUMMARY"
+          deadcode -test ./... | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - name: Unused/stale go.mod entries (go mod tidy -diff)
+        run: |
+          echo "### go mod tidy -diff" >> "$GITHUB_STEP_SUMMARY"
+          go mod tidy -diff | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - name: Coverage quality — high-coverage functions with a surviving mutant
+        run: |
+          go test ./internal/domain/... -coverprofile=/tmp/cov.out -covermode=atomic
+          go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+          for pkg in ./internal/domain/*/; do gremlins unleash "${pkg%/}" --workers 1 --timeout-coefficient 30; done > /tmp/gremlins.log 2>&1 || true
+          echo "### coverage-quality" >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/coverage-quality.py /tmp/cov.out /tmp/gremlins.log | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Open or refresh the harness:red issue on a scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/harness/red_issue.py drift "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - name: Close the harness:red issue when the scheduled run recovers
+        if: success() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/harness/red_issue.py drift --close
+
+  # ============================================================
   # CLASSIFICATION: LINTERS & STATIC ANALYSIS (API contracts)
   # ============================================================
   api-lint:
@@ -257,6 +299,41 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: govulncheck
         run: govulncheck ./...
+
+  # ============================================================
+  # CLASSIFICATION: DOCS/API DRIFT
+  # Guards against the generated "API Reference" docs
+  # (docs/docs/api-reference/rest/, produced by docusaurus-plugin-openapi-docs
+  # from apis/openapi.yaml) drifting out of sync with the spec they're
+  # supposed to mirror. Regenerates them exactly as `gen-api-docs` would and
+  # fails the PR if that produces any diff -- i.e. someone changed
+  # apis/openapi.yaml (or hand-edited the generated files) without running
+  # `npm run gen-api-docs customer-payments` and committing the result.
+  # ============================================================
+  docs-api-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - run: npm ci
+      - name: Regenerate REST API docs from apis/openapi.yaml
+        run: npm run clean-api-docs customer-payments && npm run gen-api-docs customer-payments
+      - name: Fail if generated docs differ from what's committed
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- docs/api-reference/rest; then
+            echo "::error::docs/api-reference/rest is out of sync with apis/openapi.yaml." \
+                 "Run 'npm run gen-api-docs customer-payments' inside docs/ and commit the result."
+            exit 1
+          fi
 
   # ============================================================
   # CLASSIFICATION: PACKAGING (Helm chart lint)
@@ -354,6 +431,50 @@ jobs:
           go-version-file: go.mod
       - name: Architecture fitness tests
         run: go test ./internal/architecture/... -v
+
+  trivy-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Build image (local only, not pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: "customer-payments:scan"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Trivy scan (SARIF, always uploaded)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: always()
+        with:
+          image-ref: 'customer-payments:scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          ignore-unfixed: true
+      - name: Upload Trivy SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      - name: "Trivy scan (blocking gate: CRITICAL/HIGH with a fix available)"
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: 'customer-payments:scan'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
   # ============================================================
   # CLASSIFICATION: PUBLISH (Docker image) -- push-to-main only
