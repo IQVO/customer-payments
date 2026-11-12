@@ -44,6 +44,11 @@ type world struct {
 	authID      string
 	status      int
 	body        string
+	header      http.Header
+
+	// Wave 2: the outcome of the last maintenance-policy run.
+	handled   int
+	policyErr error
 }
 
 func newWorld() *world {
@@ -88,7 +93,25 @@ func (w *world) do(method, path, body string) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
-	w.status, w.body = resp.StatusCode, string(b)
+	w.status, w.body, w.header = resp.StatusCode, string(b), resp.Header
+	return nil
+}
+
+// doKey sends one request with an explicit Idempotency-Key (a POST without
+// one is refused, so the replay and reuse scenarios name their key).
+func (w *world) doKey(method, path, key, body string) error {
+	req, err := http.NewRequest(method, w.srv.URL+path, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Idempotency-Key", key)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	b, _ := io.ReadAll(resp.Body)
+	w.status, w.body, w.header = resp.StatusCode, string(b), resp.Header
 	return nil
 }
 
