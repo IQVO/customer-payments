@@ -55,6 +55,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 		return nil
 	})
 	registerFactSteps(sc, func() *world { return w })
+	registerWave2Steps(sc, func() *world { return w })
 }
 
 func (w *world) authorize(session string, total, a1 int, a2 string) error {
