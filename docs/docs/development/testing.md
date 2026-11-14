@@ -18,7 +18,7 @@ tree (`func Test...` per file, `Scenario:` per feature file).
 | Unit: domain | `PaymentAuthorization` and `Refund` aggregates, shared money / id rules | `internal/domain/*/` | 40 tests (23 `paymentauthorization`, 10 `refund`, 7 `shared`) | `make test` |
 | Unit: use cases | every command, query, consumer and policy over in-memory doubles | `internal/application/usecases/` | 36 tests | `make test` |
 | Unit: adapters | HTTP handlers and routes (httptest over the real chi router), Kafka consumer loop / dead-letter / tracing, CloudEvents codec, outbound encoder and writer, payment provider client (httptest), telemetry, MCP and A2A adapters, boot configuration of each `cmd/*` | `internal/adapters/**`, `cmd/*/*_test.go`, `internal/bootretry` | the rest of the 307 (about 200 outside the fitness tests and the godog runner) | `make test` |
-| Behaviour (godog / Gherkin) | acceptance scenarios through the real router and use cases, in-memory doubles | `features/*.feature`, runner `internal/bdd/features_test.go` (`TestFeatures`, `Strict: true`) | 3 feature files, 16 scenarios (`authorization` 5, `capture_release` 6, `refunds` 5) | `make bdd` |
+| Behaviour (godog / Gherkin) | acceptance scenarios through the real router and use cases, in-memory doubles | `features/*.feature`, runner `internal/bdd/features_test.go` (`TestFeatures`, `Strict: true`) | 5 feature files, 56 `Scenario` and `Scenario Outline` blocks (`authorization` 4, `capture_release` 5, `payment_rules` 31, `reads_and_policies` 12, `refunds` 4) | `make bdd` |
 | Contract: repositories | one contract suite every repository implementation must pass, run against the memory doubles and against real Postgres | `internal/adapters/outbound/repocontract/` (driven by `memory_test.go` and `repositories_integration_test.go`) | shared suite | `make test`, `make integration` |
 | Contract: wire formats | golden CloudEvents per event type (`internal/adapters/outbound/kafka/testdata/*.golden.json`), MCP tool registry golden (`internal/adapters/inbound/mcp/testdata/tool_registry.golden.json`), the event catalogue checked against `apis/asyncapi.yaml` and ADR 0003 (`TestEventCatalogueMatchesContract`), OpenAPI and AsyncAPI linted with spectral in CI (`api-lint`) | as listed | 10 event goldens, 1 tool golden | `make test`, `make arch-test`; spectral in CI only |
 | Integration | real Postgres and real Kafka started by testcontainers: repositories, migrations, outbox relay, outbox trace headers, the `cmd/api` end to end, `/readyz` wiring, the `cmd/mcp` binary | files tagged `//go:build integration` (9 files) | 13 tests | `make integration` |
@@ -106,7 +106,7 @@ request, deploy on push to `main`).
 ```sh
 go test ./internal/domain/... -race          # domain only
 go test ./internal/application/usecases/ -run TestAuthorize -v
-make bdd                                     # the 16 scenarios
+make bdd                                     # the 56 scenario blocks
 make integration                             # Docker required
 go test ./cmd/api -count=1                   # boot-configuration tests, no containers
 ```
