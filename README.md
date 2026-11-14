@@ -67,8 +67,8 @@ internal/
   architecture/              the fitness tests below
   bdd/ bootretry/ testing/   godog wiring, boot retry, shared test helpers
 apis/                        openapi.yaml (REST) + asyncapi.yaml (events)
-docs/adr/                    5 ADRs
-features/                    godog scenarios (authorization, capture_release, refunds)
+docs/adr/                    7 ADRs
+features/                    godog scenarios (authorization, capture_release, payment_rules, reads_and_policies, refunds)
 charts/customer-payments/    the Helm chart
 ```
 
@@ -222,7 +222,7 @@ CI (`.github/workflows/ci.yml`) runs `lint`, `guide-lint`, `complexity`, `test`,
 
 ## Architecture Decision Records
 
-[docs/adr/](docs/adr/) — 5 ADRs (0001–0005: bounded context, assumptions, CloudEvents envelope and type catalogue, fleet observability standard, A2A inbound adapter). Cross-repo index: the [storefront ADR pages](https://iqvo.github.io/warehouse-docs/storefront/adr). See [docs/docs/operations/before-first-release.md](docs/docs/operations/before-first-release.md) for the packaging checklist.
+[docs/adr/](docs/adr/index.md) — 7 ADRs (0001–0007: bounded context, assumptions, CloudEvents envelope and type catalogue, fleet observability standard, A2A inbound adapter, fleet REST API guideline, agent authority levels and complete MCP surface). Cross-repo index: the [storefront ADR pages](https://iqvo.github.io/warehouse-docs/storefront/adr). See [docs/docs/operations/before-first-release.md](docs/docs/operations/before-first-release.md) for the packaging checklist.
 
 ## License
 
