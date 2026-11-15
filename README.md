@@ -213,7 +213,7 @@ lefthook wires the same targets as hooks (`lefthook install` once per clone): pr
 ## Tests
 
 - **Unit**: `make test` — domain, use cases, handlers, adapters.
-- **BDD**: `make bdd` — godog scenarios in `features/` (`authorization.feature`, `capture_release.feature`, `refunds.feature`).
+- **BDD**: `make bdd` — godog scenarios in `features/` (`authorization.feature`, `capture_release.feature`, `payment_rules.feature`, `reads_and_policies.feature`, `refunds.feature`; 56 scenarios).
 - **Integration**: `make integration` — testcontainers Postgres + Kafka (consumers, relay, wiring, `/readyz`).
 - **Mutation**: `make mutation` (blocking subset) / `make mutation-full` — gremlins over `internal/domain`, config in `.gremlins.yaml`.
 - **Architecture fitness**: `make arch-test` — `internal/architecture/` (hexagonal rule, CloudEvents-only, catalogue, Kafka rules, outbox cap, no-memory-in-binaries, read-only MCP/A2A).

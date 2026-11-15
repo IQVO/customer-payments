@@ -7,8 +7,9 @@ the decisions win; everything else the model leaves open is recorded here and li
 
 ## Assumptions
 
-- **A1** One authorization per checkout session; a replayed authorize returns the existing one
-  (ErrDuplicateAuthorization is mapped to the stored authorization, never to an error).
+- **A1** One authorization per checkout session; a sequential repeat of an authorize returns the
+  existing authorization (200). Only the concurrent race, two authorizes passing the live-session
+  lookup together, surfaces ErrDuplicateAuthorization, as 409 `duplicate-authorization`.
 - **A2** States are derived from the allocations (H3); a stored state field is never trusted over them.
 - **A3** Provider idempotency keys are deterministic per (operation, authorizationId, groupNo).
 - **A4** Fulfilment facts for an unbound order are parked (S4), purged after 30 days (H10) and

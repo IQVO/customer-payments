@@ -87,7 +87,7 @@ paths:
         '400':
           $ref: '#/components/responses/IdempotencyKeyProblem'
         '409':
-          description: duplicate-authorization (ErrDuplicateAuthorization), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          description: duplicate-authorization (ErrDuplicateAuthorization, only when two concurrent authorizes for one checkout session race; a sequential repeat returns the existing authorization with 200), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
