@@ -3,3 +3,8 @@ __pycache__/
 .claude/settings.local.json
 coverage.out
 .schemathesis/
+
+# go build ./cmd/<name> output at the repo root
+/a2a
+/api
+/mcp
