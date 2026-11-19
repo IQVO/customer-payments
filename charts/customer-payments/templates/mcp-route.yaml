@@ -16,6 +16,10 @@ metadata:
   labels:
     {{- include "customer-payments.labels" . | nindent 4 }}
     app.kubernetes.io/component: mcp
+  {{- with include "customer-payments.kongPluginNames" . }}
+  annotations:
+    konghq.com/plugins: {{ . | quote }}
+  {{- end }}
 spec:
   parentRefs:
     {{- range .Values.mcp.route.parentRefs }}
