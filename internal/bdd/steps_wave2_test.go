@@ -43,6 +43,12 @@ func registerRawSteps(sc *godog.ScenarioContext, get func() *world) {
 		}
 		return nil
 	})
+	sc.Step(`^the response is not marked replayed$`, func() error {
+		if got := get().header.Get("Idempotency-Replayed"); got != "" {
+			return fmt.Errorf("Idempotency-Replayed = %q, want it absent", got)
+		}
+		return nil
+	})
 	sc.Step(`^the response field "([^"]+)" is (.+)$`, func(path, want string) error {
 		v, ok := get().field(path)
 		if !ok {

@@ -37,6 +37,8 @@ func testIdempotency(t *testing.T, e Env) {
 	t.Run("the first call runs fn and commits it with the record, a repeat replays", func(t *testing.T) { idemReplay(t, e) })
 	t.Run("a 4xx answer is stored", func(t *testing.T) { idemClientError(t, e) })
 	t.Run("a 5xx, an error and a panic store nothing and undo the writes", func(t *testing.T) { idemRollback(t, e) })
+	t.Run("a released answer stores nothing, undoes the writes and frees the key", func(t *testing.T) { idemRelease(t, e) })
+	t.Run("a copy waiting on a released key runs fn itself", func(t *testing.T) { idemWaitOnRelease(t, e) })
 	t.Run("an expired record is taken over", func(t *testing.T) { idemExpired(t, e) })
 	t.Run("concurrent calls with one key run fn once", func(t *testing.T) { idemConcurrent(t, e) })
 }
@@ -174,5 +176,92 @@ func idemConcurrent(t *testing.T, e Env) {
 	}
 	if n != 1 {
 		t.Fatalf("%d authorizations were created, want exactly one", n)
+	}
+}
+
+// idemRelease: a RETRYABLE refusal (Record.Release, ADR 0008) leaves no key row and none of
+// its writes, so the same key runs fn again and another request under the released key is a
+// new request, not a reuse.
+func idemRelease(t *testing.T, e Env) {
+	var calls atomic.Int32
+	refusal := func(c context.Context) (idempotency.Record, error) {
+		calls.Add(1)
+		fatalIf(t, e.Authorizations.Save(c, newAuth(t, "pay-irl", "cs-irl", 0)), "save in fn")
+		return idempotency.Record{Status: 409, ContentType: "application/problem+json", Body: []byte(`{"r":1}`), Release: true}, nil
+	}
+	rec, replayed, err := idemDo(e, "k-rel", "h1", refusal)
+	fatalIf(t, err, "first call")
+	if replayed || rec.Status != 409 || !rec.Release {
+		t.Fatalf("first call: replayed=%v rec=%+v, want the 409 answered fresh", replayed, rec)
+	}
+	if authExists(e, "pay-irl") {
+		t.Fatal("the writes of a released answer must be undone")
+	}
+	got, replayed, err := idemDo(e, "k-rel", "h2", answerAfterSaving(t, e, "pay-irl2", 201, &calls))
+	fatalIf(t, err, "another request under the released key")
+	if replayed || got.Status != 201 || got.RequestHash != "h2" || calls.Load() != 2 || !authExists(e, "pay-irl2") {
+		t.Fatalf("another request under the released key: replayed=%v rec=%+v calls=%d, want a new request that runs and commits", replayed, got, calls.Load())
+	}
+	if again, replayed, err := idemDo(e, "k-rel", "h2", refusal); err != nil || !replayed || again.Status != 201 || calls.Load() != 2 {
+		t.Fatalf("the success is stored: replayed=%v rec=%+v calls=%d err=%v", replayed, again, calls.Load(), err)
+	}
+}
+
+// releaseProbe is the fn of idemWaitOnRelease: the first run answers a released 409, every
+// later run commits an authorization and answers 201; it counts the runs and how many were in
+// flight together.
+type releaseProbe struct {
+	t                   *testing.T
+	e                   Env
+	calls, active, peak atomic.Int32
+}
+
+func (p *releaseProbe) run(c context.Context) (idempotency.Record, error) {
+	n := p.calls.Add(1)
+	cur := p.active.Add(1)
+	for old := p.peak.Load(); cur > old && !p.peak.CompareAndSwap(old, cur); old = p.peak.Load() {
+	}
+	time.Sleep(100 * time.Millisecond) // let the others queue behind the claim
+	p.active.Add(-1)
+	if n == 1 {
+		return idempotency.Record{Status: 409, Release: true}, nil
+	}
+	fatalIf(p.t, p.e.Authorizations.Save(c, newAuth(p.t, "pay-iwr", "cs-iwr", 0)), "save in fn")
+	return idempotency.Record{Status: 201, Body: []byte("ok")}, nil
+}
+
+// idemWaitOnRelease: copies of a request queued behind a claimant whose answer is released
+// never replay that answer and never run alongside it: one of them takes the key over, runs fn
+// and stores its success; the others replay that.
+func idemWaitOnRelease(t *testing.T, e Env) {
+	const callers = 8
+	probe := &releaseProbe{t: t, e: e}
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		fresh   = map[int]int{}
+		replays int
+	)
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rec, replayed, err := e.Idempotency.Do(ctx(), "k-wait-rel", "h", e.Clock.Now().UTC(), probe.run)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				t.Errorf("Do: %v", err)
+			}
+			if replayed {
+				replays++
+			} else {
+				fresh[rec.Status]++
+			}
+		}()
+	}
+	wg.Wait()
+	if probe.calls.Load() != 2 || probe.peak.Load() != 1 || fresh[409] != 1 || fresh[201] != 1 || replays != callers-2 || !authExists(e, "pay-iwr") {
+		t.Fatalf("fn ran %d times (%d at once), fresh answers %v, %d replays of %d callers; want 2 runs, never together, one 409, one 201 and %d replays",
+			probe.calls.Load(), probe.peak.Load(), fresh, replays, callers, callers-2)
 	}
 }
