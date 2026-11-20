@@ -128,11 +128,13 @@ type IdempotencyStore interface {
 	// caller compares the record's RequestHash with its own. Otherwise Do claims
 	// the key and runs fn with a ctx that carries the unit of work: everything fn
 	// writes through the repositories, the outbox included, commits atomically
-	// with the record fn returns, stamped with at. A record with a status below
-	// 500 is stored (a 4xx too, so a retry is deterministic). A 5xx record, an
-	// error or a panic rolls everything back and stores nothing, so the retry
-	// runs fn again. A concurrent Do for the same key waits for the claimant,
-	// then replays its answer (or runs fn itself when nothing was stored).
+	// with the record fn returns, stamped with at. A record is stored unless it
+	// asks to be released (Record.Release: a 4xx whose problem type is
+	// RETRYABLE, ADR 0008). A released record, a 5xx record, an error or a
+	// panic rolls everything back, key row included, and stores nothing, so
+	// the retry runs fn again. A concurrent Do for the same key waits for the
+	// claimant, then replays its answer (or runs fn itself when nothing was
+	// stored).
 	Do(ctx context.Context, key, requestHash string, at time.Time,
 		fn func(ctx context.Context) (idempotency.Record, error)) (rec idempotency.Record, replayed bool, err error)
 }

@@ -124,8 +124,8 @@ func (s *IdempotencyStore) attempt(ctx context.Context, key, requestHash string,
 	if rec, err = fn(pgtx.With(ctx, tx)); err != nil {
 		return idempotency.Record{}, false, false, err
 	}
-	if rec.Status >= httpServerError {
-		return rec, false, false, nil // rolled back by the defer: a 5xx is never stored
+	if rec.Release || rec.Status >= httpServerError {
+		return rec, false, false, nil // rolled back by the defer, key row included: a released answer and a 5xx are never stored
 	}
 	if err := settleSavepoint(ctx, tx, rec.Status); err != nil {
 		return idempotency.Record{}, false, false, err

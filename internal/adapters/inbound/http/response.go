@@ -48,7 +48,9 @@ func decodeJSON(r *http.Request, dest any) error {
 // writeError writes err as its RFC 9457 problem. An unmapped error is a 500
 // whose detail never leaks the internal message (it is logged instead).
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
-	p := problemFor(err)
+	e := entryFor(err)
+	p := e.p
+	markReplay(w, e.replay)
 	detail := err.Error()
 	if p == internalProblem {
 		slog.ErrorContext(r.Context(), "request failed", "error", sanitizeLog(err.Error()), "method", sanitizeLog(r.Method), "path", sanitizeLog(r.URL.Path))

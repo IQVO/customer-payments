@@ -14,4 +14,9 @@ type Record struct {
 	ContentType string
 	Body        []byte
 	CreatedAt   time.Time
+	// Release asks the store not to remember the answer: the request is rolled
+	// back, key row included, so the key is free and the same request runs again.
+	// The middleware sets it for every answer that is not a 2xx and whose problem
+	// type is not FINAL or OUTCOME (ADR 0008).
+	Release bool
 }
