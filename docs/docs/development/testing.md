@@ -52,6 +52,23 @@ and never `t.Skip` on them: each boots its own containers
 Most carry a companion `...SensorBites` / `...FailsOnBadFixtures` test proving
 the sensor fails on a bad fixture.
 
+## Idempotency replay classes (`internal/adapters/inbound/http/`)
+
+Every problem type of the catalogue declares a replay class (FINAL, OUTCOME, RETRYABLE;
+[ADR 0008](/docs/adr/0008-every-problem-type-has-a-replay-class)). These unit tests need no Docker:
+
+| Test | Enforces |
+| --- | --- |
+| `TestEveryProblemTypeDeclaresAReplayClass`, `TestTheUnclassifiedEntryCheckBites` | a catalogue entry without a class (or a 5xx entry that is not RETRYABLE) fails |
+| `TestEveryProblemTypeIsReplayedOrReExecutedByItsClass` and the per-class tests | the real middleware over the in-memory store: FINAL and OUTCOME replay, RETRYABLE and every 5xx run again, a 2xx is stored, a panic is not |
+| `TestAnUnclassifiedErrorAnswerIsNotStored`, `TestACopyWaitingOnARetryableFirstRunsItself` | an error answer with no class is released; a concurrent duplicate takes a released key over |
+| `TestTheADRDeclaresTheClassOfEveryProblem` | the class table of ADR 0008 equals the catalogue, both ways |
+| `TestHandlersAnswerErrorsOnlyThroughWriteError` | no handler writes a problem by hand, so the class always marks the capture |
+
+The repository contract suite (`repocontract`, memory and Postgres) pins the store side (`a released
+answer stores nothing`), and `cmd/api/retryable_integration_test.go` pins a released `concurrent-update` and
+`not-found` over the real router and Postgres (`make integration`).
+
 ## `make` targets
 
 | Target | Runs | In `check` / `check-all`? |

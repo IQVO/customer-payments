@@ -264,14 +264,21 @@ Behavior — Idempotency-Key middleware (`internal/adapters/inbound/http/idempot
   `/refunds/{refundId}/retries`) requires an `Idempotency-Key` header of 1 to 128 printable ASCII
   characters (absent: 400 `idempotency-key-required`, malformed: 400
   `idempotency-key-invalid`).
-- The key is global. The first response below 500 (a 4xx too) is stored for 24
+- The key is global. A 2xx, and a 4xx whose problem type is FINAL for the request
+  (`malformed-request`, `allocation-mismatch`, `negative-amount`), is stored for 24
   hours in the same transaction as the aggregate change and its outbox rows; a
   repeat with the same request (method + path + body hash) replays it with
   header `Idempotency-Replayed: true`; the same key with a different request is
   409 problem `idempotency-key-reused`. Concurrent requests with one key are
-  serialised by the unique index on `idempotency_keys`; the loser replays.
-- 5xx responses and panics roll back and are never stored, so the key stays
-  retryable.
+  serialised by the unique index on `idempotency_keys`; the loser replays the
+  stored answer, or runs the request itself when the first one was released.
+- A refusal that depends on state that can change is RETRYABLE (`not-found`,
+  `concurrent-update`, `illegal-transition`, `over-refund`, `payment-declined`,
+  `validation-failed`; the class of every problem type is in
+  [ADR 0008](/docs/adr/0008-every-problem-type-has-a-replay-class)): nothing is
+  stored, the key row is rolled back with the request and the same key runs the
+  request again; another body under it is a new request. 5xx responses and
+  panics roll back and are never stored either, so the key stays retryable.
 
 ## Alerts and dashboards
 

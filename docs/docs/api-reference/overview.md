@@ -48,14 +48,20 @@ under *Spec versus code* below.
 - **Idempotency-Key.** Required on every `POST` (the four write routes); 1 to
   128 printable ASCII characters, a client-generated UUID per logical submit. The
   key is global (the same key on another route is a different request). The
-  request fingerprint is method + path + SHA-256 of the body. The first response
-  below 500 (a 4xx too) is stored for 24 hours in the same transaction as the
-  aggregate change and its outbox rows; a repeat of the same request replays it
-  byte for byte with `Idempotency-Replayed: true` (only a replay carries the
-  header); the same key with a different request is `409 idempotency-key-reused`;
-  a missing key is `400 idempotency-key-required` and a malformed or over-long
-  one `400 idempotency-key-invalid`. 5xx answers and panics roll back and are
-  never stored. Provider calls carry their own deterministic keys per
+  request fingerprint is method + path + SHA-256 of the body. A 2xx, and a 4xx
+  whose problem type is final for the request (`malformed-request`,
+  `allocation-mismatch`, `negative-amount`), is stored for 24 hours in the same
+  transaction as the aggregate change and its outbox rows; a repeat of the same
+  request replays it byte for byte with `Idempotency-Replayed: true` (only a
+  replay carries the header); the same key with a different request is
+  `409 idempotency-key-reused`; a missing key is `400 idempotency-key-required`
+  and a malformed or over-long one `400 idempotency-key-invalid`. A refusal that
+  depends on state that can change (`not-found`, `concurrent-update`,
+  `illegal-transition`, `over-refund`, `payment-declined`, `validation-failed`),
+  a 5xx and a panic are not stored: the request rolls back, key row included,
+  and the same key runs again (another request under it is a new request). The
+  class of every problem type is in
+  [ADR 0008](/docs/adr/0008-every-problem-type-has-a-replay-class). Provider calls carry their own deterministic keys per
   (operation, authorization, group), so a retried request cannot move money twice.
 - **Collections are keyset-paged.** `GET /payment-authorizations` and
   `GET /refunds` take `limit` (1 to 500, default 100) and an opaque `cursor`,

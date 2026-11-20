@@ -42,14 +42,14 @@ All errors are RFC 9457 `application/problem+json` with `type` `/problems/<slug>
 | --- | --- | --- |
 | 400 `idempotency-key-required` | a `POST` without `Idempotency-Key` | send one key per logical request |
 | 400 `idempotency-key-invalid` | the key is not 1 to 128 printable ASCII characters | send a UUID |
-| 409 `idempotency-key-reused` | the same key with a different request (method, path or body) | mint a new key per logical request, or keep the body byte-stable; a correct replay returns the stored answer with `Idempotency-Replayed: true`. Distinguish it from the business 409s by the problem type |
+| 409 `idempotency-key-reused` | the same key with a different request (method, path or body) | mint a new key per logical request, or keep the body byte-stable; a correct replay returns the stored answer with `Idempotency-Replayed: true`. A key whose first answer was a RETRYABLE refusal or a 5xx was released: it is free again and a different body under it is a new request, not a reuse. Distinguish it from the business 409s by the problem type |
 | 400 `invalid-limit`, `invalid-cursor` | a `limit` outside 1 to 500, or a `cursor` that is not a `nextCursor` of this list | fix the value; repeat the filters with the cursor |
 | 400 `unknown-query-parameter` | a list was called with a parameter it does not declare, e.g. the retired `after`, `offset` or `nextToken` | use `limit` and `cursor`; read `items` and follow `nextCursor` |
 | 400 `malformed-request` | bad JSON, unknown field, wrong type | fix the body (see `apis/openapi.yaml`) |
 | 422 `validation-failed` | e.g. `exactly one of orderId and checkoutSessionId is required` on `GET /payment-authorizations`, or `orderId is required` on `GET /refunds` | send the missing / exclusive parameter |
 | 422 `allocation-mismatch` | allocations do not sum to `totalMinor` or repeat a `groupNo` | fix the allocations |
 | 422 `unknown-group` | a refund or fact names a `groupNo` the authorization does not have | check `GET /payment-authorizations/{authorizationId}` |
-| 422 `payment-declined` | the provider declined an operation that has no stored-decline form | read `detail` for the code |
+| 422 `payment-declined` | the provider declined a void (a declined authorization is a stored `DECLINED` record answered 201; a declined refund is a `FAILED` refund). Not stored: the key is released | read `detail` for the code; the same key asks the provider again, which answers from its own record |
 | 404 `not-found` | unknown authorization or refund id, or `POST /refunds` for an order with no bound authorization (`authorization of order ...: not found`) | the order is bound by the `CheckoutCompleted` event; see "Facts stay parked" below |
 | 409 `duplicate-authorization` | two concurrent authorize requests for one checkout session raced past the live-session lookup (the database allows one non-`DECLINED` authorization per session); a sequential repeat returns the existing authorization with `200` instead | read it back with `GET /payment-authorizations?checkoutSessionId=` |
 | 409 `order-already-bound` | the authorization is bound to a different order | check the checkout event that bound it |
