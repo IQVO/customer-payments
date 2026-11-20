@@ -18,6 +18,7 @@ import (
 	outboundkafka "github.com/IQVO/customer-payments/internal/adapters/outbound/kafka"
 	"github.com/IQVO/customer-payments/internal/adapters/outbound/paymentprovider"
 	"github.com/IQVO/customer-payments/internal/adapters/outbound/postgres"
+	"github.com/IQVO/customer-payments/internal/application/ports"
 	"github.com/IQVO/customer-payments/internal/application/usecases"
 	"github.com/IQVO/customer-payments/internal/testing/pgtest"
 	"github.com/IQVO/customer-payments/internal/testing/providerfake"
@@ -31,6 +32,9 @@ type idemRig struct {
 	url  string
 	rows func(t *testing.T, query string, args ...any) int // runs a count(*) query
 	fake *providerfake.Fake
+	// exec runs one statement outside any request; auths is the real repository.
+	exec  func(t *testing.T, sql string)
+	auths ports.AuthorizationRepository
 }
 
 func newIdemRig(t *testing.T) *idemRig {
@@ -64,7 +68,13 @@ func newIdemRig(t *testing.T) *idemRig {
 		}
 		return n
 	}
-	return &idemRig{url: ts.URL, rows: rows, fake: fake}
+	exec := func(t *testing.T, sql string) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	return &idemRig{url: ts.URL, rows: rows, fake: fake, exec: exec, auths: postgres.NewAuthorizationRepository(pool)}
 }
 
 type idemReply struct {

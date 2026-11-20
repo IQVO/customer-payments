@@ -33,11 +33,14 @@ const maxKeyLength = 128
 // The store runs the handler inside the transaction that claims the key, so the
 // key row, the aggregate change and the outbox rows commit together and
 // concurrent requests with one key are serialised by the unique index: the
-// loser replays the winner's answer. The first answer below 500 (a 4xx too) is
-// stored for 24 hours (idempotency.TTL); the same key and fingerprint replays it
-// with Idempotency-Replayed: true, the same key with another fingerprint is 409
-// idempotency-key-reused. A 5xx or a panic rolls back and is never stored, so
-// the key can retry the real work.
+// loser replays the winner's answer, or runs the handler itself when the winner
+// released the key. Whether an answer is stored is its replay class (ADR 0008):
+// a 2xx is stored for 24 hours (idempotency.TTL); a 4xx is stored when the
+// catalogue entry of its problem is FINAL or OUTCOME; a RETRYABLE or unclassified
+// 4xx and a 5xx or a panic roll everything back, key row included, and are never
+// stored, so the key can retry the real work. The same key and fingerprint
+// replays a stored answer with Idempotency-Replayed: true; the same key with
+// another fingerprint is 409 idempotency-key-reused.
 func RequireIdempotencyKey(store ports.IdempotencyStore, clock ports.Clock) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +134,21 @@ type capture struct {
 	header http.Header
 	code   int
 	body   bytes.Buffer
+	// replay is the class of the problem the handler answered with (markReplay).
+	replay replayClass
 }
+
+// replayMarker is what writeError tells the capturing writer: the replay class
+// of the problem it answers with. Any other writer ignores it.
+type replayMarker interface{ markReplay(replayClass) }
+
+func markReplay(w http.ResponseWriter, class replayClass) {
+	if m, ok := w.(replayMarker); ok {
+		m.markReplay(class)
+	}
+}
+
+func (c *capture) markReplay(class replayClass) { c.replay = class }
 
 func (c *capture) Header() http.Header { return c.header }
 
@@ -155,9 +172,23 @@ func (c *capture) status() int {
 	return c.code
 }
 
-// record is the answer as the store keeps it.
+// remembered reports whether the answer is stored under its key: a 2xx, or an
+// error answer whose problem type declares FINAL or OUTCOME. A 5xx never is; an
+// error answer with no class (a handler that wrote a bare status) is not either.
+func (c *capture) remembered() bool {
+	switch s := c.status(); {
+	case s >= http.StatusInternalServerError:
+		return false
+	case s >= http.StatusOK && s < http.StatusMultipleChoices:
+		return true
+	default:
+		return c.replay.stored()
+	}
+}
+
+// record is the answer as the store keeps it; Release asks the store not to.
 func (c *capture) record() idempotency.Record {
-	return idempotency.Record{Status: c.status(), ContentType: c.header.Get("Content-Type"), Body: c.body.Bytes()}
+	return idempotency.Record{Status: c.status(), ContentType: c.header.Get("Content-Type"), Body: c.body.Bytes(), Release: !c.remembered()}
 }
 
 func (c *capture) flushTo(w http.ResponseWriter) {

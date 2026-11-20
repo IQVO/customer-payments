@@ -26,9 +26,15 @@ info:
     idempotency-key-invalid (400) and idempotency-key-reused (409). Every
     write (each POST) takes an Idempotency-Key header: a retry with the same
     key and the same request (method, path, body) replays the first answer
-    (Idempotency-Replayed: true; any answer below 500 is stored for 24 hours,
-    a 5xx is never stored), the same key with another request is 409
-    idempotency-key-reused. A body that is not one JSON object of the declared
+    (Idempotency-Replayed: true). A 2xx is stored for 24 hours, and so is a
+    refusal that is final for the request (malformed-request,
+    allocation-mismatch, negative-amount); a refusal that depends on state that
+    can change (not-found, concurrent-update, illegal-transition, over-refund,
+    payment-declined, validation-failed) and a 5xx are never stored: the key is
+    released, the same Idempotency-Key runs the request again, and another
+    request under it is a new request, not idempotency-key-reused. Otherwise
+    the same key with another request is 409 idempotency-key-reused. A body
+    that is not one JSON object of the declared
     fields (unknown field, trailing data, over 64 KiB, a NUL character) is 400
     malformed-request; a NUL character in a path is 404 resource-not-found.
     Any operation can answer 500
@@ -87,13 +93,13 @@ paths:
         '400':
           $ref: '#/components/responses/IdempotencyKeyProblem'
         '409':
-          description: duplicate-authorization (ErrDuplicateAuthorization, only when two concurrent authorizes for one checkout session race; a sequential repeat returns the existing authorization with 200), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          description: duplicate-authorization (ErrDuplicateAuthorization, only when two concurrent authorizes for one checkout session race; a sequential repeat returns the existing authorization with 200) or concurrent-update; neither is stored, the key is released and the same Idempotency-Key runs again. Or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: validation-failed, negative-amount or allocation-mismatch (ErrAllocationMismatch, also a groupNo that appears twice).
+          description: validation-failed (not stored; the key is released), negative-amount or allocation-mismatch (ErrAllocationMismatch, also a groupNo that appears twice); both stored and replayed.
           content:
             application/problem+json:
               schema:
@@ -189,13 +195,13 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: illegal-transition (already captured, voided or expired), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          description: illegal-transition (already captured, voided or expired) or concurrent-update; neither is stored, the key is released and the same Idempotency-Key runs again. Or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
         '422':
-          description: payment-declined (the provider refused the void).
+          description: payment-declined (the provider refused the void). Not stored; the key is released and the same Idempotency-Key asks the provider again, which answers from its own record.
           content:
             application/problem+json:
               schema:
@@ -245,7 +251,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: over-refund (ErrOverRefund), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          description: over-refund (ErrOverRefund) or concurrent-update; neither is stored, the key is released and the same Idempotency-Key runs again. Or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
@@ -337,7 +343,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: illegal-transition (the refund is not FAILED, or its 5 attempts are used), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
+          description: illegal-transition (the refund is not FAILED, or its 5 attempts are used) or concurrent-update; neither is stored, the key is released and the same Idempotency-Key runs again. Or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
@@ -354,7 +360,14 @@ components:
         Client-generated UUID per logical submit (1 to 128 printable ASCII
         characters); a retry reuses it. The same key with the same request
         (method, path, body) replays the stored answer with
-        Idempotency-Replayed: true; the same key with another request is 409
+        Idempotency-Replayed: true. A 2xx is stored for 24 hours, and so is a
+        refusal that is final for the request (malformed-request,
+        allocation-mismatch, negative-amount); a refusal that depends on state
+        that can change (not-found, concurrent-update, illegal-transition,
+        over-refund, payment-declined, validation-failed) and a 5xx are not
+        stored: the key is released and the same key runs the request again, and
+        another request under a released key is a new request. The same key
+        with another request while an answer is stored is 409
         idempotency-key-reused. Missing is 400 idempotency-key-required, not
         1 to 128 printable ASCII characters is 400 idempotency-key-invalid.
       schema:
@@ -398,7 +411,7 @@ components:
         enum: ['true']
   responses:
     NotFound:
-      description: not-found (no such resource, or an identifier longer than 128 characters); resource-not-found for a path that carries a NUL character.
+      description: not-found (no such resource, or an identifier longer than 128 characters); not stored on a write; the order of a refund may be bound a moment later, so the key is released and the same Idempotency-Key runs again. resource-not-found for a path that carries a NUL character.
       content:
         application/problem+json:
           schema:
@@ -410,7 +423,7 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
-      description: validation-failed.
+      description: validation-failed (on a write it is not stored; the key is released and the same Idempotency-Key runs again).
       content:
         application/problem+json:
           schema:
