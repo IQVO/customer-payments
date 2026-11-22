@@ -73,7 +73,7 @@ func problemFromUseCase(err error, notFoundDetail string) *problem {
 	case errors.Is(err, shared.ErrValidation):
 		return problemValidation("the skill arguments failed this context's validation rules")
 	default:
-		slog.Error("a2a skill failed", "error", err)
+		slog.Error("a2a skill failed", "error", logReplacer.Replace(err.Error()))
 		return problemInternal()
 	}
 }
