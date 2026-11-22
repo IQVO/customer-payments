@@ -75,10 +75,10 @@ func (d Deps) settleRefund(ctx context.Context, p *pa, f *refund.Refund) error {
 		events, err = f.RecordFailure(provider.Code(err), d.now())
 		if err == nil && f.Exhausted() {
 			d.logger().ErrorContext(ctx, "ALERT refund failed for good: operator action needed",
-				"refund_id", string(f.ID()), "order_id", f.OrderID(), "code", f.FailureCode(), "attempts", f.Attempts())
+				"refund_id", sanitizeLog(string(f.ID())), "order_id", sanitizeLog(f.OrderID()), "code", sanitizeLog(f.FailureCode()), "attempts", f.Attempts())
 		}
 	default:
-		d.logger().WarnContext(ctx, "refund left REQUESTED: payment provider unavailable", "refund_id", string(f.ID()), "error", err)
+		d.logger().WarnContext(ctx, "refund left REQUESTED: payment provider unavailable", "refund_id", sanitizeLog(string(f.ID())), "error", sanitizeErr(err))
 		return nil
 	}
 	if err != nil {
@@ -141,8 +141,8 @@ func (d Deps) auditManualRefund(ctx context.Context, f *refund.Refund) {
 		"amount_minor", f.AmountMinor(),
 		"currency", logReplacer.Replace(f.Currency()),
 		"reason", logReplacer.Replace(string(f.Reason())),
-		"state", string(f.State()),
-		"created_at", f.CreatedAt().Format(time.RFC3339Nano),
+		"state", sanitizeLog(string(f.State())),
+		"created_at", sanitizeLog(f.CreatedAt().Format(time.RFC3339Nano)),
 	)
 }
 

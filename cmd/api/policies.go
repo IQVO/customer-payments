@@ -41,7 +41,7 @@ func runPolicies(ctx context.Context, logger *slog.Logger, runners []policyRunne
 	for _, r := range runners {
 		n, err := r.run(ctx)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			logger.Error("policy pass failed", "policy", r.name, "error", err)
+			logger.Error("policy pass failed", "policy", r.name, "error", sanitizeErr(err))
 			continue
 		}
 		if n > 0 {

@@ -190,7 +190,7 @@ func (l *consumeLoop) run(ctx context.Context) error {
 			if fetchFailures < maxTransientFetchFailures && transientFetchError(err) {
 				fetchFailures++
 				l.logger.WarnContext(ctx, l.name+" broker connection stalled or lost; fetching again after the backoff",
-					"error", err, "attempt", fetchFailures, "backoff", delay.String())
+					"error", sanitizeErr(err), "attempt", fetchFailures, "backoff", delay.String())
 				if sleepErr := sleep(ctx, delay); sleepErr != nil {
 					return ctx.Err()
 				}
@@ -237,20 +237,20 @@ func (l *consumeLoop) handleWithDeadLetter(ctx context.Context, p RetryPolicy, s
 		}
 		if errors.Is(err, errPoison) {
 			l.logger.ErrorContext(ctx, l.name+" message can never be applied; dead-lettering it without retry",
-				"error", err, "partition", msg.Partition, "offset", msg.Offset)
+				"error", sanitizeErr(err), "partition", msg.Partition, "offset", msg.Offset)
 			return l.retryUntilOK(ctx, p, sleep, "dead-letter publish", msg, func() error {
 				return l.deadLetter(ctx, msg, err)
 			})
 		}
 		if attempt == l.maxAttempts {
 			l.logger.ErrorContext(ctx, l.name+" handling failed after the maximum attempts; dead-lettering the message",
-				"error", err, "partition", msg.Partition, "offset", msg.Offset, "attempts", attempt)
+				"error", sanitizeErr(err), "partition", msg.Partition, "offset", msg.Offset, "attempts", attempt)
 			return l.retryUntilOK(ctx, p, sleep, "dead-letter publish", msg, func() error {
 				return l.deadLetter(ctx, msg, err)
 			})
 		}
 		l.logger.ErrorContext(ctx, l.name+" handling failed; retrying the same message",
-			"error", err, "partition", msg.Partition, "offset", msg.Offset,
+			"error", sanitizeErr(err), "partition", msg.Partition, "offset", msg.Offset,
 			"attempt", attempt, "max_attempts", l.maxAttempts, "retry_in", delay)
 		if serr := sleep(ctx, delay); serr != nil {
 			return serr
@@ -276,7 +276,7 @@ func (l *consumeLoop) retryUntilOK(ctx context.Context, p RetryPolicy, sleep sle
 			return ctx.Err()
 		}
 		l.logger.ErrorContext(ctx, l.name+" "+what+" failed; retrying the same message",
-			"error", err, "partition", msg.Partition, "offset", msg.Offset,
+			"error", sanitizeErr(err), "partition", msg.Partition, "offset", msg.Offset,
 			"attempt", attempt, "retry_in", delay)
 		if err := sleep(ctx, delay); err != nil {
 			return err
