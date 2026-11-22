@@ -95,7 +95,7 @@ func (c *Consumer) HandleMessage(ctx context.Context, value []byte) error {
 	logger := defaultLogger(c.Logger)
 	e, err := cloudevents.Decode(value)
 	if err != nil {
-		logger.WarnContext(ctx, "skipping a message that is not a valid CloudEvent", "consumer", c.Name, "topic", c.Topic, "error", err)
+		logger.WarnContext(ctx, "skipping a message that is not a valid CloudEvent", "consumer", c.Name, "topic", c.Topic, "error", sanitizeErr(err))
 		return nil
 	}
 	handle, ok := c.Handlers[e.Type()]
@@ -107,10 +107,10 @@ func (c *Consumer) HandleMessage(ctx context.Context, value []byte) error {
 		return err
 	}
 	if c.DeadLetterInvalid && c.DLQ != nil {
-		logger.WarnContext(ctx, "dead-lettering an event that can never be applied", "consumer", c.Name, "type", e.Type(), "event_id", e.ID(), "error", err)
+		logger.WarnContext(ctx, "dead-lettering an event that can never be applied", "consumer", c.Name, "type", sanitizeLog(e.Type()), "event_id", sanitizeLog(e.ID()), "error", sanitizeErr(err))
 		return fmt.Errorf("%w: %w", errPoison, err)
 	}
-	logger.WarnContext(ctx, "skipping an event that can never be applied", "consumer", c.Name, "type", e.Type(), "event_id", e.ID(), "error", err)
+	logger.WarnContext(ctx, "skipping an event that can never be applied", "consumer", c.Name, "type", sanitizeLog(e.Type()), "event_id", sanitizeLog(e.ID()), "error", sanitizeErr(err))
 	return nil
 }
 

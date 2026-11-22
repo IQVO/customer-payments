@@ -44,7 +44,7 @@ func (u ReauthorizeBeforeExpiry) Execute(ctx context.Context) (int, error) {
 		case err == nil:
 			handled++
 		case skippable(err):
-			u.logger().WarnContext(ctx, "re-authorization skipped", "authorization_id", string(id), "error", err)
+			u.logger().WarnContext(ctx, "re-authorization skipped", "authorization_id", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		default:
 			return handled, err
 		}
@@ -104,7 +104,7 @@ func (u VoidUnboundAuthorizations) Execute(ctx context.Context) (int, error) {
 		case err == nil:
 			handled++
 		case skippable(err):
-			u.logger().WarnContext(ctx, "void of unbound authorization skipped", "authorization_id", string(id), "error", err)
+			u.logger().WarnContext(ctx, "void of unbound authorization skipped", "authorization_id", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		default:
 			return handled, err
 		}
@@ -151,6 +151,6 @@ func (u MaintainParkedFacts) escalate(ctx context.Context, f parked.Fact) error 
 		return err
 	}
 	u.logger().ErrorContext(ctx, "ALERT fact for an unbound order dead-lettered",
-		"order_id", f.OrderID, "kind", string(f.Kind), "event_id", f.EventID)
+		"order_id", sanitizeLog(f.OrderID), "kind", sanitizeLog(string(f.Kind)), "event_id", sanitizeLog(f.EventID))
 	return u.Parked.MarkEscalated(ctx, f.EventID, u.now())
 }

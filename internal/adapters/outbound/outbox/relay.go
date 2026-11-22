@@ -127,8 +127,8 @@ func (r *Relay) logAttemptCap(ctx context.Context, err error) {
 		return
 	}
 	r.logger.ErrorContext(ctx, AttemptCapReachedMsg,
-		"outbox_id", sf.RowID, "topic", sf.Message.Topic, "event_type", sf.Message.EventType,
-		"key", string(sf.Message.Key), "attempts", sf.Attempts, "max_attempts", r.maxAttempts, "error", sf.Err)
+		"outbox_id", sf.RowID, "topic", sf.Message.Topic, "event_type", sanitizeLog(sf.Message.EventType),
+		"key", sanitizeLog(string(sf.Message.Key)), "attempts", sf.Attempts, "max_attempts", r.maxAttempts, "error", sanitizeErr(sf.Err))
 }
 
 // Run drains the outbox until ctx is cancelled and then returns ctx.Err().
@@ -144,7 +144,7 @@ func (r *Relay) Run(ctx context.Context) error {
 		}
 		n, err := r.RelayOnce(ctx)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			r.logger.ErrorContext(ctx, "outbox relay pass failed", "error", err)
+			r.logger.ErrorContext(ctx, "outbox relay pass failed", "error", sanitizeErr(err))
 		}
 		if n == r.batchSize && err == nil {
 			continue

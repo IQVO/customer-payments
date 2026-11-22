@@ -120,7 +120,7 @@ func (d Deps) refundPackage(ctx context.Context, p *pa, f parked.Fact, reason re
 	}
 	_, err = d.openRefund(ctx, p, groupNo, left, reason)
 	if errors.Is(err, refund.ErrOverRefund) {
-		d.logger().WarnContext(ctx, "refund skipped: over refund", "order_id", p.OrderID(), "group_no", groupNo)
+		d.logger().WarnContext(ctx, "refund skipped: over refund", "order_id", sanitizeLog(p.OrderID()), "group_no", groupNo)
 		return false, nil
 	}
 	return false, err
