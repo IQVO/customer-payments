@@ -5,7 +5,8 @@ ALL Kong configuration -- routes AND plugins -- belongs to the application's Hel
 Terraform. Chart-rendered objects are Helm/ArgoCD reconciled forever; the old Terraform-side objects vanished on a
 cluster rebuild. This test is the sensor for that decision. It fails if:
   * the default values (ci/default-values.yaml) render any Kong object or HTTPRoute (standalone installs must be unaffected),
-  * any enabled HTTPRoute renders WITHOUT the konghq.com/plugins annotation,
+  * any enabled api/reports HTTPRoute renders WITHOUT the konghq.com/plugins annotation
+    (MCP + A2A routes are the Agent Router's and must carry NO Kong annotation),
   * the annotation names KongPlugins the chart does not render,
   * any auth/authorization plugin is configured (forbidden fleet-wide),
   * the MCP route does not rewrite its prefix to /mcp or the reports route to /reports,
@@ -66,6 +67,17 @@ def main() -> int:
         failures.append("the enabled render contains no KongPlugin at all")
     for r in routes:
         ann = (r.get("metadata", {}).get("annotations") or {}).get("konghq.com/plugins")
+        if r["metadata"]["name"].endswith(("-a2a", "-mcp")):
+            # MCP + A2A are exposed by the Agent Router (Envoy Gateway), not Kong
+            # (warehouse-infra ADR 0014 / 0015): no Kong annotation, not on the Kong Gateway.
+            if any(k.startswith("konghq.com/") for k in (r.get("metadata", {}).get("annotations") or {})):
+                failures.append(f"HTTPRoute {r['metadata']['name']} carries a konghq.com/* annotation; "
+                                "MCP/A2A routes belong to the Agent Router, not Kong")
+            for ref in r.get("spec", {}).get("parentRefs", []):
+                if ref.get("name") == "warehouse-gateway" or ref.get("namespace") == "kong":
+                    failures.append(f"HTTPRoute {r['metadata']['name']} attaches to the Kong Gateway "
+                                    f"({ref.get('name')}/{ref.get('namespace')}); use the agent-router Gateway")
+            continue
         if not ann:
             failures.append(f"HTTPRoute {r['metadata']['name']} has no konghq.com/plugins annotation")
             continue
@@ -107,7 +119,7 @@ def main() -> int:
         for f in failures:
             print(f"  - {f}")
         return 1
-    print(f"PASS: {len(routes)} HTTPRoutes annotated, {len(plugins)} KongPlugins, no auth plugin, defaults are a no-op")
+    print(f"PASS: {len(routes)} HTTPRoutes checked (api/reports Kong-annotated, mcp/a2a on the Agent Router), {len(plugins)} KongPlugins, no auth plugin, defaults are a no-op")
     return 0
 
 
